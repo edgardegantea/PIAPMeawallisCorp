@@ -158,6 +158,8 @@ $routes->group('api', ['filter' => 'auth'], function ($routes) {
 
     // Activity Log
     $routes->get('projects/(:num)/activity',   'Api\ActivityController::index/$1');
+    $routes->put('activity/(:num)',            'Api\ActivityController::update/$1');
+    $routes->delete('activity/(:num)',         'Api\ActivityController::delete/$1');
 
     // Favorites
     $routes->get('favorites',                  'Api\FavoritesController::index');

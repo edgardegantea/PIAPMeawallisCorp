@@ -99,6 +99,8 @@ export const projectsAPI = {
 
   // Activity
   getActivity:    (projectId)   => api.get(`/projects/${projectId}/activity`),
+  updateActivity: (id, data)    => api.put(`/activity/${id}`, data),
+  deleteActivity: (id)          => api.delete(`/activity/${id}`),
 
   // Favorites
   getFavorites:   ()            => api.get('/favorites'),

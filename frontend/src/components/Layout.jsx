@@ -41,7 +41,8 @@ export default function Layout({ children }) {
   const searchInputRef = useRef(null);
 
   const isMac  = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin      = user?.role === 'ADMIN';
+  const isTeamMember = user?.role === 'TEAM_MEMBER';
 
   // Close mobile sidebar on route change
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
@@ -111,7 +112,7 @@ export default function Layout({ children }) {
       { to: '/users',            icon: Shield,    label: 'Usuarios' },
       { to: '/permissions',      icon: Lock,      label: 'Permisos' },
       { to: '/company-settings', icon: Building2, label: 'Empresa' },
-    ])] : [navSection('Configuración', [
+    ])] : isTeamMember ? [] : [navSection('Configuración', [
       { to: '/company-settings', icon: Building2, label: 'Empresa' },
     ])]),
     navSection('Cuenta', [

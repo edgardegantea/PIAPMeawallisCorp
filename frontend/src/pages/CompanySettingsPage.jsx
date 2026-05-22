@@ -3,7 +3,7 @@ import { projectsAPI } from '../services/projectsAPI';
 import { useAuthStore } from '../stores/authStore';
 import Layout from '../components/Layout';
 import { toast } from 'sonner';
-import { Save, Building2 } from 'lucide-react';
+import { Save, Building2, Lock } from 'lucide-react';
 
 const FIELDS = [
   { key: 'name',                label: 'Nombre Comercial',    required: true },
@@ -20,18 +20,20 @@ const FIELDS = [
 
 export default function CompanySettingsPage() {
   const { user } = useAuthStore();
-  const isAdmin  = user?.role === 'ADMIN';
+  const isAdmin      = user?.role === 'ADMIN';
+  const isTeamMember = user?.role === 'TEAM_MEMBER';
 
   const [form, setForm]     = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving]   = useState(false);
 
   useEffect(() => {
+    if (isTeamMember) { setLoading(false); return; }
     projectsAPI.getCompanySettings()
       .then((r) => setForm(r.data || {}))
       .catch(() => toast.error('Error al cargar configuración'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [isTeamMember]);
 
   const handle = async (e) => {
     e.preventDefault();
@@ -45,6 +47,22 @@ export default function CompanySettingsPage() {
   };
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  if (isTeamMember) {
+    return (
+      <Layout>
+        <div className="p-4 sm:p-6 flex flex-col items-center justify-center min-h-[60vh] text-center">
+          <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
+            <Lock size={28} className="text-slate-400" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-700 dark:text-slate-200 mb-2">Acceso restringido</h2>
+          <p className="text-slate-500 dark:text-slate-400 text-sm max-w-xs">
+            La información de la empresa no está disponible para tu rol.
+          </p>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>

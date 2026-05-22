@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { projectsAPI } from '../services/projectsAPI';
+import { useAuthStore } from '../stores/authStore';
 import Layout from '../components/Layout';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Tag, X, Check } from 'lucide-react';
@@ -12,6 +13,9 @@ const PRESET_COLORS = [
 const EMPTY = { name: '', description: '', color: '#667eea' };
 
 export default function CategoriesPage() {
+  const authUser     = useAuthStore((s) => s.user);
+  const canWrite     = authUser?.role !== 'TEAM_MEMBER';
+
   const [categories, setCategories] = useState([]);
   const [loading, setLoading]       = useState(true);
   const [showModal, setShowModal]   = useState(false);
@@ -89,12 +93,14 @@ export default function CategoriesPage() {
             <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Categorías</h1>
             <p className="text-slate-500 dark:text-slate-400 text-sm">{categories.length} categorías configuradas</p>
           </div>
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2.5 rounded-lg transition-colors text-sm"
-          >
-            <Plus size={16} /> Nueva Categoría
-          </button>
+          {canWrite && (
+            <button
+              onClick={openCreate}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2.5 rounded-lg transition-colors text-sm"
+            >
+              <Plus size={16} /> Nueva Categoría
+            </button>
+          )}
         </div>
 
         {/* Grid */}
@@ -148,20 +154,22 @@ export default function CategoriesPage() {
                 </div>
 
                 {/* Acciones */}
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                  <button
-                    onClick={() => openEdit(cat)}
-                    className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-indigo-600 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
-                  >
-                    <Pencil size={14} /> Editar
-                  </button>
-                  <button
-                    onClick={() => handleDelete(cat)}
-                    className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
-                  >
-                    <Trash2 size={14} /> Eliminar
-                  </button>
-                </div>
+                {canWrite && (
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button
+                      onClick={() => openEdit(cat)}
+                      className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-indigo-600 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
+                    >
+                      <Pencil size={14} /> Editar
+                    </button>
+                    <button
+                      onClick={() => handleDelete(cat)}
+                      className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                    >
+                      <Trash2 size={14} /> Eliminar
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

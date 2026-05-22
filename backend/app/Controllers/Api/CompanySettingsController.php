@@ -3,6 +3,7 @@
 namespace App\Controllers\Api;
 
 use App\Controllers\BaseController;
+use App\Libraries\Auth;
 use App\Models\CompanySettingsModel;
 use CodeIgniter\HTTP\ResponseInterface;
 
@@ -17,11 +18,17 @@ class CompanySettingsController extends BaseController
 
     public function show(): ResponseInterface
     {
+        if (Auth::user()['role'] === 'TEAM_MEMBER') {
+            return $this->response->setStatusCode(403)->setJSON(['message' => 'Acceso restringido']);
+        }
         return $this->response->setJSON($this->model->getSettings());
     }
 
     public function update(): ResponseInterface
     {
+        if (Auth::user()['role'] === 'TEAM_MEMBER') {
+            return $this->response->setStatusCode(403)->setJSON(['message' => 'No tienes permisos para esta acción']);
+        }
         $settings = $this->model->getSettings();
         $data     = $this->request->getJSON(true) ?? $this->request->getPost();
 

@@ -3,6 +3,7 @@
 namespace App\Controllers\Api;
 
 use App\Controllers\BaseController;
+use App\Libraries\Auth;
 use App\Models\ProjectCategoryModel;
 use CodeIgniter\HTTP\ResponseInterface;
 
@@ -31,6 +32,9 @@ class CategoriesController extends BaseController
 
     public function create(): ResponseInterface
     {
+        if (Auth::user()['role'] === 'TEAM_MEMBER') {
+            return $this->response->setStatusCode(403)->setJSON(['message' => 'No tienes permisos para esta acción']);
+        }
         $data  = $this->request->getJSON(true) ?? $this->request->getPost();
         $rules = ['name' => 'required|max_length[100]|is_unique[project_categories.name]'];
 
@@ -44,6 +48,9 @@ class CategoriesController extends BaseController
 
     public function update(int $id): ResponseInterface
     {
+        if (Auth::user()['role'] === 'TEAM_MEMBER') {
+            return $this->response->setStatusCode(403)->setJSON(['message' => 'No tienes permisos para esta acción']);
+        }
         if (!$this->model->find($id)) {
             return $this->response->setStatusCode(404)->setJSON(['message' => 'Categoría no encontrada']);
         }
@@ -54,6 +61,9 @@ class CategoriesController extends BaseController
 
     public function delete(int $id): ResponseInterface
     {
+        if (Auth::user()['role'] === 'TEAM_MEMBER') {
+            return $this->response->setStatusCode(403)->setJSON(['message' => 'No tienes permisos para esta acción']);
+        }
         if (!$this->model->find($id)) {
             return $this->response->setStatusCode(404)->setJSON(['message' => 'Categoría no encontrada']);
         }
