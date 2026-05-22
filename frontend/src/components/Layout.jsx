@@ -144,7 +144,11 @@ export default function Layout({ children }) {
         {/* Logo + toggle */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-slate-700 h-12">
           {sidebarOpen && (
-            <span className="font-bold text-base text-indigo-400 tracking-tight truncate">PIAP v2</span>
+            <img
+              src="/assets/img/logos/maewalliscorpv3.jpg"
+              alt="MaeWallisCorp"
+              className="h-8 object-contain rounded"
+            />
           )}
           {/* Desktop toggle */}
           <button

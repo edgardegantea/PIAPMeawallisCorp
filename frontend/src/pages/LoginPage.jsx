@@ -28,9 +28,11 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-900 via-slate-800 to-slate-900 p-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-indigo-100 rounded-xl mb-4">
-            <LogIn className="text-indigo-600" size={28} />
-          </div>
+          <img
+            src="/assets/img/logos/maewalliscorpv3.jpg"
+            alt="MaeWallisCorp"
+            className="h-20 mx-auto mb-4 object-contain rounded-xl"
+          />
           <h1 className="text-2xl font-bold text-slate-800">PIAP v2</h1>
           <p className="text-slate-500 text-sm mt-1">Plataforma de Gestión de Proyectos</p>
         </div>
