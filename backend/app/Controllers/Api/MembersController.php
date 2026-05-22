@@ -3,6 +3,7 @@
 namespace App\Controllers\Api;
 
 use App\Controllers\BaseController;
+use App\Libraries\Auth;
 use App\Libraries\ProjectGate;
 use App\Models\ProjectMemberModel;
 use CodeIgniter\HTTP\ResponseInterface;
@@ -18,9 +19,44 @@ class MembersController extends BaseController
 
     public function index(): ResponseInterface
     {
+        $user      = Auth::user();
         $projectId = $this->request->getGet('project');
+
+        // TEAM_MEMBER solo puede ver miembros de proyectos donde él mismo participa
+        if ($user['role'] === 'TEAM_MEMBER') {
+            if ($projectId) {
+                // Verificar que el TEAM_MEMBER pertenece a este proyecto
+                $isMember = $this->model
+                    ->where('project_id', (int) $projectId)
+                    ->where('user_id',    (int) $user['id'])
+                    ->first();
+
+                if (! $isMember) {
+                    return $this->response->setStatusCode(403)
+                        ->setJSON(['message' => 'No tienes acceso a los miembros de este proyecto']);
+                }
+
+                return $this->response->setJSON($this->model->findByProject((int) $projectId));
+            }
+
+            // Sin project_id: devolver solo miembros de sus propios proyectos
+            $myProjectIds = array_column(
+                $this->model->select('project_id')->where('user_id', (int) $user['id'])->findAll(),
+                'project_id'
+            );
+
+            if (empty($myProjectIds)) {
+                return $this->response->setJSON([]);
+            }
+
+            return $this->response->setJSON(
+                $this->model->whereIn('project_id', $myProjectIds)->findAll()
+            );
+        }
+
+        // Otros roles: acceso completo
         if ($projectId) {
-            return $this->response->setJSON($this->model->findByProject((int)$projectId));
+            return $this->response->setJSON($this->model->findByProject((int) $projectId));
         }
         return $this->response->setJSON($this->model->findAll());
     }
