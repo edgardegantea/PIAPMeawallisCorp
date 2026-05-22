@@ -25,7 +25,7 @@ const PRIORITIES = ['BAJA','MEDIA','ALTA','CRITICA'];
 
 export default function ProjectsListPage() {
   const authUser = useAuthStore((s) => s.user);
-  const canCreateProject = authUser?.role !== 'TEAM_MEMBER';
+  const canCreateProject = true; // todos los roles pueden crear proyectos
 
   const [projects, setProjects]     = useState([]);
   const [categories, setCategories] = useState([]);
