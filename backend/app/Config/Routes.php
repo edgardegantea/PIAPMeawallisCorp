@@ -1,0 +1,195 @@
+<?php
+
+use CodeIgniter\Router\RouteCollection;
+
+/** @var RouteCollection $routes */
+
+// ─── Preflight OPTIONS global (CORS) ─────────────────────────────────────────
+// El navegador envía OPTIONS antes de cualquier PATCH/PUT/DELETE cross-origin.
+// Respondemos 204 inmediatamente sin pasar por el filtro de autenticación.
+$routes->options('(:any)', static function () {
+    return service('response')->setStatusCode(204)->setBody('');
+});
+
+// Auth (público)
+$routes->post('api/auth/register',        'Api\AuthController::register');
+$routes->post('api/auth/login',           'Api\AuthController::login');
+$routes->post('api/auth/token/refresh',   'Api\AuthController::refresh');
+
+// Auth (protegidas)
+$routes->group('api/auth', ['filter' => 'auth'], function ($routes) {
+    $routes->post('logout',           'Api\AuthController::logout');
+    $routes->get('profile',           'Api\AuthController::profile');
+    $routes->patch('profile/update',  'Api\AuthController::updateProfile');
+});
+
+// Perfil extendido (certificaciones y logros)
+$routes->group('api/profile', ['filter' => 'auth'], function ($routes) {
+    $routes->get('certifications',            'Api\CertificationsController::index');
+    $routes->post('certifications',           'Api\CertificationsController::create');
+    $routes->patch('certifications/(:num)',   'Api\CertificationsController::update/$1');
+    $routes->delete('certifications/(:num)',  'Api\CertificationsController::delete/$1');
+
+    $routes->get('achievements',             'Api\AchievementsController::index');
+    $routes->post('achievements',            'Api\AchievementsController::create');
+    $routes->patch('achievements/(:num)',    'Api\AchievementsController::update/$1');
+    $routes->delete('achievements/(:num)',   'Api\AchievementsController::delete/$1');
+});
+
+// API protegida
+$routes->group('api', ['filter' => 'auth'], function ($routes) {
+
+    // Proyectos
+    $routes->get('projects',                     'Api\ProjectsController::index');
+    $routes->get('projects/statistics',          'Api\ProjectsController::statistics');
+    $routes->get('projects/my',                  'Api\ProjectsController::myProjects');
+    $routes->post('projects',                    'Api\ProjectsController::create');
+    $routes->get('projects/(:num)',              'Api\ProjectsController::show/$1');
+    $routes->put('projects/(:num)',              'Api\ProjectsController::update/$1');
+    $routes->patch('projects/(:num)',            'Api\ProjectsController::update/$1');
+    $routes->delete('projects/(:num)',           'Api\ProjectsController::delete/$1');
+    $routes->post('projects/(:num)/progress',   'Api\ProjectsController::updateProgress/$1');
+
+    // Categorías
+    $routes->get('categories',           'Api\CategoriesController::index');
+    $routes->post('categories',          'Api\CategoriesController::create');
+    $routes->get('categories/(:num)',    'Api\CategoriesController::show/$1');
+    $routes->put('categories/(:num)',    'Api\CategoriesController::update/$1');
+    $routes->patch('categories/(:num)', 'Api\CategoriesController::update/$1');
+    $routes->delete('categories/(:num)','Api\CategoriesController::delete/$1');
+
+    // Sprints
+    $routes->get('sprints',                       'Api\SprintsController::index');
+    $routes->get('sprints/velocity',              'Api\SprintsController::velocity');
+    $routes->post('sprints',                      'Api\SprintsController::create');
+    $routes->get('sprints/(:num)',                'Api\SprintsController::show/$1');
+    $routes->get('sprints/(:num)/burndown',       'Api\SprintsController::burndown/$1');
+    $routes->put('sprints/(:num)',                'Api\SprintsController::update/$1');
+    $routes->patch('sprints/(:num)',              'Api\SprintsController::update/$1');
+    $routes->delete('sprints/(:num)',             'Api\SprintsController::delete/$1');
+
+    // Backlog
+    $routes->get('backlog',           'Api\BacklogController::index');
+    $routes->post('backlog',          'Api\BacklogController::create');
+    $routes->get('backlog/(:num)',    'Api\BacklogController::show/$1');
+    $routes->put('backlog/(:num)',    'Api\BacklogController::update/$1');
+    $routes->patch('backlog/(:num)', 'Api\BacklogController::update/$1');
+    $routes->delete('backlog/(:num)','Api\BacklogController::delete/$1');
+
+    // Tasks
+    $routes->get('tasks',                                 'Api\TasksController::index');
+    $routes->post('tasks',                                'Api\TasksController::create');
+    $routes->get('tasks/(:num)',                          'Api\TasksController::show/$1');
+    $routes->put('tasks/(:num)',                          'Api\TasksController::update/$1');
+    $routes->patch('tasks/(:num)',                        'Api\TasksController::update/$1');
+    $routes->delete('tasks/(:num)',                       'Api\TasksController::delete/$1');
+
+    // Task Comments
+    $routes->get('tasks/(:num)/comments',                'Api\TaskCommentsController::index/$1');
+    $routes->post('tasks/(:num)/comments',               'Api\TaskCommentsController::create/$1');
+    $routes->put('task-comments/(:num)',                  'Api\TaskCommentsController::update/$1');
+    $routes->patch('task-comments/(:num)',                'Api\TaskCommentsController::update/$1');
+    $routes->delete('task-comments/(:num)',               'Api\TaskCommentsController::delete/$1');
+
+    // Milestones
+    $routes->get('milestones',                            'Api\MilestonesController::index');
+    $routes->post('milestones',                           'Api\MilestonesController::create');
+    $routes->get('milestones/(:num)',                     'Api\MilestonesController::show/$1');
+    $routes->put('milestones/(:num)',                     'Api\MilestonesController::update/$1');
+    $routes->patch('milestones/(:num)',                   'Api\MilestonesController::update/$1');
+    $routes->delete('milestones/(:num)',                  'Api\MilestonesController::delete/$1');
+    $routes->post('milestones/(:num)/complete',           'Api\MilestonesController::complete/$1');
+
+    // Risks
+    $routes->get('risks',           'Api\RisksController::index');
+    $routes->post('risks',          'Api\RisksController::create');
+    $routes->get('risks/(:num)',    'Api\RisksController::show/$1');
+    $routes->put('risks/(:num)',    'Api\RisksController::update/$1');
+    $routes->patch('risks/(:num)', 'Api\RisksController::update/$1');
+    $routes->delete('risks/(:num)','Api\RisksController::delete/$1');
+
+    // Incidents
+    $routes->get('incidents',           'Api\IncidentsController::index');
+    $routes->post('incidents',          'Api\IncidentsController::create');
+    $routes->get('incidents/(:num)',    'Api\IncidentsController::show/$1');
+    $routes->put('incidents/(:num)',    'Api\IncidentsController::update/$1');
+    $routes->patch('incidents/(:num)', 'Api\IncidentsController::update/$1');
+    $routes->delete('incidents/(:num)','Api\IncidentsController::delete/$1');
+
+    // Members
+    $routes->get('members',           'Api\MembersController::index');
+    $routes->post('members',          'Api\MembersController::create');
+    $routes->put('members/(:num)',    'Api\MembersController::update/$1');
+    $routes->patch('members/(:num)', 'Api\MembersController::update/$1');
+    $routes->delete('members/(:num)','Api\MembersController::delete/$1');
+
+    // Documents
+    $routes->get('documents',         'Api\DocumentsController::index');
+    $routes->post('documents',        'Api\DocumentsController::upload');
+    $routes->delete('documents/(:num)','Api\DocumentsController::delete/$1');
+
+    // Users (lectura disponible para todos los autenticados)
+    $routes->get('users',            'Api\UsersController::index');
+    $routes->get('users/(:num)',     'Api\UsersController::show/$1');
+
+    // Notificaciones
+    $routes->get('notifications',    'Api\NotificationsController::index');
+
+    // Reportes
+    $routes->get('reports/overview',        'Api\ReportsController::overview');
+    $routes->get('reports/project/(:num)',   'Api\ReportsController::project/$1');
+
+    // Company Settings
+    $routes->get('company-settings',    'Api\CompanySettingsController::show');
+    $routes->put('company-settings',    'Api\CompanySettingsController::update');
+    $routes->patch('company-settings',  'Api\CompanySettingsController::update');
+
+    // Task Checklists
+    $routes->get('tasks/(:num)/checklists',    'Api\ChecklistsController::index/$1');
+    $routes->post('tasks/(:num)/checklists',   'Api\ChecklistsController::create/$1');
+    $routes->patch('checklists/(:num)',         'Api\ChecklistsController::update/$1');
+    $routes->delete('checklists/(:num)',        'Api\ChecklistsController::delete/$1');
+
+    // Task Time Logs
+    $routes->get('tasks/(:num)/timelogs',      'Api\TimeLogsController::index/$1');
+    $routes->post('tasks/(:num)/timelogs',     'Api\TimeLogsController::create/$1');
+    $routes->patch('timelogs/(:num)',           'Api\TimeLogsController::update/$1');
+    $routes->delete('timelogs/(:num)',          'Api\TimeLogsController::delete/$1');
+
+    // Activity Log
+    $routes->get('projects/(:num)/activity',   'Api\ActivityController::index/$1');
+
+    // Favorites
+    $routes->get('favorites',                  'Api\FavoritesController::index');
+    $routes->post('favorites/(:num)',           'Api\FavoritesController::toggle/$1');
+
+    // Workload
+    $routes->get('projects/(:num)/workload',   'Api\WorkloadController::index/$1');
+
+    // Global Search
+    $routes->get('search',                     'Api\SearchController::index');
+
+    // Contratos de proyecto
+    $routes->get('projects/(:num)/contracts',    'Api\ContractsController::index/$1');
+    $routes->post('projects/(:num)/contracts',   'Api\ContractsController::create/$1');
+    $routes->patch('contracts/(:num)',            'Api\ContractsController::update/$1');
+    $routes->delete('contracts/(:num)',           'Api\ContractsController::delete/$1');
+
+    // Documentación técnica de proyecto
+    $routes->get('projects/(:num)/technicaldocs',    'Api\TechnicalDocsController::index/$1');
+    $routes->post('projects/(:num)/technicaldocs',   'Api\TechnicalDocsController::create/$1');
+    $routes->patch('technicaldocs/(:num)',            'Api\TechnicalDocsController::update/$1');
+    $routes->delete('technicaldocs/(:num)',           'Api\TechnicalDocsController::delete/$1');
+});
+
+// Rutas ADMIN (auth + admin filter)
+$routes->group('api/admin', ['filter' => ['auth', 'admin']], function ($routes) {
+    // User management
+    $routes->post('users',                   'Api\UsersController::create');
+    $routes->patch('users/(:num)',            'Api\UsersController::update/$1');
+    $routes->put('users/(:num)',              'Api\UsersController::update/$1');
+    $routes->delete('users/(:num)',           'Api\UsersController::delete/$1');
+    $routes->post('users/(:num)/activate',   'Api\UsersController::activate/$1');
+    // Permissions panel
+    $routes->get('teams',                    'Api\MembersController::allTeams');
+});

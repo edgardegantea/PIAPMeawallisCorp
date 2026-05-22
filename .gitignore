@@ -1,0 +1,15 @@
+# Backend
+backend/vendor/
+backend/.env
+backend/writable/logs/
+backend/writable/cache/
+backend/writable/session/
+backend/writable/uploads/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+
+# macOS
+.DS_Store
