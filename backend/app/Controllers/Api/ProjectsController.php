@@ -63,6 +63,11 @@ class ProjectsController extends BaseController
 
     public function create(): ResponseInterface
     {
+        if (Auth::user()['role'] === 'TEAM_MEMBER') {
+            return $this->response->setStatusCode(403)
+                ->setJSON(['message' => 'Sin permisos para crear proyectos']);
+        }
+
         $data  = $this->request->getJSON(true) ?? $this->request->getPost();
         $rules = [
             'code'               => 'required|max_length[20]|is_unique[projects.code]',
