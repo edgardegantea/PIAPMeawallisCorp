@@ -55,10 +55,12 @@ api.interceptors.response.use(
 export default api;
 
 export const authAPI = {
-  register:      (d)    => api.post('/auth/register', d),
-  login:         (d)    => api.post('/auth/login', d),
-  logout:        ()     => api.post('/auth/logout'),
-  getProfile:    ()     => api.get('/auth/profile'),
-  updateProfile: (d)    => api.patch('/auth/profile/update', d),
-  refresh:       (tok)  => api.post('/auth/token/refresh', { refresh: tok }),
+  register:       (d)         => api.post('/auth/register', d),
+  login:          (d)         => api.post('/auth/login', d),
+  logout:         ()          => api.post('/auth/logout'),
+  getProfile:     ()          => api.get('/auth/profile'),
+  updateProfile:  (d)         => api.patch('/auth/profile/update', d),
+  refresh:        (tok)       => api.post('/auth/token/refresh', { refresh: tok }),
+  forgotPassword: (email)     => api.post('/auth/forgot-password', { email }),
+  resetPassword:  (token, pw) => api.post('/auth/reset-password', { token, password: pw }),
 };

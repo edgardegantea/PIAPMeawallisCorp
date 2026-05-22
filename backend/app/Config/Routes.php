@@ -15,6 +15,8 @@ $routes->options('(:any)', static function () {
 $routes->post('api/auth/register',        'Api\AuthController::register');
 $routes->post('api/auth/login',           'Api\AuthController::login');
 $routes->post('api/auth/token/refresh',   'Api\AuthController::refresh');
+$routes->post('api/auth/forgot-password', 'Api\AuthController::forgotPassword');
+$routes->post('api/auth/reset-password',  'Api\AuthController::resetPassword');
 
 // Auth (protegidas)
 $routes->group('api/auth', ['filter' => 'auth'], function ($routes) {

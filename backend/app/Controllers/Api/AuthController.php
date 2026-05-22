@@ -5,6 +5,7 @@ namespace App\Controllers\Api;
 use App\Controllers\BaseController;
 use App\Libraries\Auth;
 use App\Libraries\JWTHandler;
+use App\Models\PasswordResetModel;
 use App\Models\RefreshTokenModel;
 use App\Models\UserModel;
 use CodeIgniter\HTTP\ResponseInterface;
@@ -206,6 +207,94 @@ class AuthController extends BaseController
             'message' => 'Perfil actualizado correctamente',
             'user'    => $this->userModel->safeFind($user['id']),
         ]);
+    }
+
+    /**
+     * POST /api/auth/forgot-password
+     * Genera token y envía correo de restablecimiento.
+     */
+    public function forgotPassword(): ResponseInterface
+    {
+        $data  = $this->request->getJSON(true) ?? $this->request->getPost();
+        $email = trim($data['email'] ?? '');
+
+        if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return $this->response->setStatusCode(422)
+                ->setJSON(['message' => 'Correo electrónico inválido']);
+        }
+
+        // Siempre responder OK para no revelar si el email existe
+        $user = $this->userModel->where('email', $email)->first();
+        if (!$user) {
+            return $this->response->setJSON(['message' => 'Si el correo existe, recibirás un enlace en breve.']);
+        }
+
+        $resetModel = new PasswordResetModel();
+        $token      = $resetModel->generate($email);
+        $frontendUrl = rtrim((string)(env('APP_FRONTEND_URL') ?? 'https://piap.maewalliscorp.org'), '/');
+        $resetLink   = "{$frontendUrl}/reset-password?token={$token}";
+
+        $emailService = \Config\Services::email();
+        $emailService->setFrom(
+            (string)(env('MAIL_FROM_ADDRESS') ?? env('email.fromEmail') ?? 'noreply@maewalliscorp.org'),
+            (string)(env('MAIL_FROM_NAME')    ?? 'PIAP MaeWallisCorp')
+        );
+        $emailService->setTo($email);
+        $emailService->setSubject('Restablecer contraseña — PIAP');
+        $emailService->setMailType('html');
+        $emailService->setMessage("
+            <p>Hola <strong>{$user['first_name']}</strong>,</p>
+            <p>Recibimos una solicitud para restablecer tu contraseña en PIAP.</p>
+            <p>Haz clic en el siguiente enlace para continuar (válido por 1 hora):</p>
+            <p><a href='{$resetLink}' style='background:#4f46e5;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block'>
+                Restablecer contraseña
+            </a></p>
+            <p style='color:#6b7280;font-size:13px'>Si no solicitaste este cambio, ignora este mensaje.</p>
+            <p style='color:#6b7280;font-size:13px'>{$resetLink}</p>
+        ");
+
+        if (!$emailService->send()) {
+            log_message('error', '[ForgotPassword] ' . $emailService->printDebugger(['headers']));
+            return $this->response->setStatusCode(500)
+                ->setJSON(['message' => 'Error al enviar el correo. Intenta más tarde.']);
+        }
+
+        return $this->response->setJSON(['message' => 'Si el correo existe, recibirás un enlace en breve.']);
+    }
+
+    /**
+     * POST /api/auth/reset-password
+     * Valida token y actualiza la contraseña.
+     */
+    public function resetPassword(): ResponseInterface
+    {
+        $data     = $this->request->getJSON(true) ?? $this->request->getPost();
+        $token    = trim($data['token']    ?? '');
+        $password = trim($data['password'] ?? '');
+
+        if (!$token) {
+            return $this->response->setStatusCode(422)->setJSON(['message' => 'Token requerido']);
+        }
+        if (strlen($password) < 8) {
+            return $this->response->setStatusCode(422)
+                ->setJSON(['message' => 'La contraseña debe tener al menos 8 caracteres']);
+        }
+
+        $resetModel = new PasswordResetModel();
+        $email      = $resetModel->verify($token);
+
+        if (!$email) {
+            return $this->response->setStatusCode(400)
+                ->setJSON(['message' => 'El enlace es inválido o ya expiró']);
+        }
+
+        $this->userModel->where('email', $email)
+            ->set(['password' => password_hash($password, PASSWORD_DEFAULT)])
+            ->update();
+
+        $resetModel->consume($token);
+
+        return $this->response->setJSON(['message' => 'Contraseña actualizada correctamente']);
     }
 
     // ─── helpers ──────────────────────────────────────────────────────────────

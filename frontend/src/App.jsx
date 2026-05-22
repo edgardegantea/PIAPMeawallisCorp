@@ -4,8 +4,10 @@ import { Toaster } from 'sonner';
 import { useAuthStore } from './stores/authStore';
 import { useThemeStore } from './stores/themeStore';
 
-import LoginPage          from './pages/LoginPage';
-import RegisterPage       from './pages/RegisterPage';
+import LoginPage           from './pages/LoginPage';
+import RegisterPage        from './pages/RegisterPage';
+import ForgotPasswordPage  from './pages/ForgotPasswordPage';
+import ResetPasswordPage   from './pages/ResetPasswordPage';
 import DashboardPage      from './pages/DashboardPage';
 import ProfilePage        from './pages/ProfilePage';
 import CategoriesPage     from './pages/CategoriesPage';
@@ -38,8 +40,10 @@ export default function App() {
       <Toaster position="top-right" richColors closeButton />
       <Routes>
         {/* Public */}
-        <Route path="/"         element={<PublicRoute><LoginPage /></PublicRoute>} />
-        <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+        <Route path="/"                 element={<PublicRoute><LoginPage /></PublicRoute>} />
+        <Route path="/register"         element={<PublicRoute><RegisterPage /></PublicRoute>} />
+        <Route path="/forgot-password"  element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
+        <Route path="/reset-password"   element={<PublicRoute><ResetPasswordPage /></PublicRoute>} />
 
         {/* Protected */}
         <Route path="/dashboard"        element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
