@@ -5,6 +5,7 @@ namespace App\Controllers\Api;
 use App\Controllers\BaseController;
 use App\Libraries\ActivityLogger;
 use App\Libraries\Auth;
+use App\Libraries\ProjectGate;
 use App\Models\IncidentModel;
 use CodeIgniter\HTTP\ResponseInterface;
 
@@ -53,6 +54,9 @@ class IncidentsController extends BaseController
             return $this->response->setStatusCode(422)
                 ->setJSON(['errors' => $this->validator->getErrors()]);
         }
+        if (!ProjectGate::canWrite((int) $data['project_id'])) {
+            return ProjectGate::deny($this->response);
+        }
 
         $data['reported_by'] = Auth::id();
         $id       = $this->model->insert($data);
@@ -77,6 +81,9 @@ class IncidentsController extends BaseController
             return $this->response->setStatusCode(404)
                 ->setJSON(['message' => 'Incidencia no encontrada']);
         }
+        if (!ProjectGate::canWrite((int) $before['project_id'])) {
+            return ProjectGate::deny($this->response);
+        }
 
         $data = $this->request->getJSON(true) ?? $this->request->getPost();
         $this->model->update($id, $data);
@@ -98,9 +105,13 @@ class IncidentsController extends BaseController
 
     public function delete(int $id): ResponseInterface
     {
-        if (! $this->model->find($id)) {
+        $incident = $this->model->find($id);
+        if (! $incident) {
             return $this->response->setStatusCode(404)
                 ->setJSON(['message' => 'Incidencia no encontrada']);
+        }
+        if (!ProjectGate::canWrite((int) $incident['project_id'])) {
+            return ProjectGate::deny($this->response);
         }
 
         $this->model->delete($id);

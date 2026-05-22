@@ -4,6 +4,7 @@ import { projectsAPI } from '../../services/projectsAPI';
 import Layout from '../../components/Layout';
 import { toast } from 'sonner';
 import { Plus, Search, FolderKanban, Filter, X, Star } from 'lucide-react';
+import { useAuthStore } from '../../stores/authStore';
 
 const STATUS_COLORS = {
   INICIACION: 'bg-indigo-100 text-indigo-700', PLANIFICACION: 'bg-purple-100 text-purple-700',
@@ -23,6 +24,9 @@ const STATUSES   = ['INICIACION','PLANIFICACION','EJECUCION','MONITOREO','CIERRE
 const PRIORITIES = ['BAJA','MEDIA','ALTA','CRITICA'];
 
 export default function ProjectsListPage() {
+  const authUser = useAuthStore((s) => s.user);
+  const canCreateProject = authUser?.role !== 'TEAM_MEMBER';
+
   const [projects, setProjects]     = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading]       = useState(true);
@@ -92,10 +96,12 @@ export default function ProjectsListPage() {
             <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Proyectos</h1>
             <p className="text-slate-500 dark:text-slate-400 text-sm">{visibleProjects.length} proyecto{visibleProjects.length !== 1 ? 's' : ''}</p>
           </div>
-          <Link to="/projects/new"
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2.5 rounded-lg transition-colors text-sm">
-            <Plus size={16} /> Nuevo Proyecto
-          </Link>
+          {canCreateProject && (
+            <Link to="/projects/new"
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2.5 rounded-lg transition-colors text-sm">
+              <Plus size={16} /> Nuevo Proyecto
+            </Link>
+          )}
         </div>
 
         {/* Search + filter bar */}

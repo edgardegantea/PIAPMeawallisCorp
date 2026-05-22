@@ -4,6 +4,7 @@ namespace App\Controllers\Api;
 
 use App\Controllers\BaseController;
 use App\Libraries\Auth;
+use App\Libraries\ProjectGate;
 use App\Models\ProjectDocumentModel;
 use CodeIgniter\HTTP\ResponseInterface;
 
@@ -41,6 +42,9 @@ class DocumentsController extends BaseController
             return $this->response->setStatusCode(422)
                 ->setJSON(['message' => 'El campo project_id es requerido']);
         }
+        if (!ProjectGate::canWrite((int) $projectId)) {
+            return ProjectGate::deny($this->response);
+        }
 
         $uploadPath = WRITEPATH . 'uploads/documents/';
         if (! is_dir($uploadPath)) {
@@ -71,6 +75,9 @@ class DocumentsController extends BaseController
         if (! $doc) {
             return $this->response->setStatusCode(404)
                 ->setJSON(['message' => 'Documento no encontrado']);
+        }
+        if (!ProjectGate::canWrite((int) $doc['project_id'])) {
+            return ProjectGate::deny($this->response);
         }
 
         $filePath = WRITEPATH . $doc['file_path'];

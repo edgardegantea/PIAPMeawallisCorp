@@ -3,6 +3,7 @@
 namespace App\Controllers\Api;
 
 use App\Controllers\BaseController;
+use App\Libraries\ProjectGate;
 use App\Models\ProjectMemberModel;
 use CodeIgniter\HTTP\ResponseInterface;
 
@@ -32,6 +33,9 @@ class MembersController extends BaseController
         if (!$this->validate($rules)) {
             return $this->response->setStatusCode(422)->setJSON(['errors' => $this->validator->getErrors()]);
         }
+        if (!ProjectGate::canWrite((int) $data['project_id'])) {
+            return ProjectGate::deny($this->response);
+        }
 
         $exists = $this->model->where('project_id', $data['project_id'])
                               ->where('user_id', $data['user_id'])->first();
@@ -46,8 +50,12 @@ class MembersController extends BaseController
 
     public function update(int $id): ResponseInterface
     {
-        if (!$this->model->find($id)) {
+        $member = $this->model->find($id);
+        if (!$member) {
             return $this->response->setStatusCode(404)->setJSON(['message' => 'Miembro no encontrado']);
+        }
+        if (!ProjectGate::canWrite((int) $member['project_id'])) {
+            return ProjectGate::deny($this->response);
         }
         $data = $this->request->getJSON(true) ?? $this->request->getPost();
         $this->model->update($id, ['role' => $data['role'] ?? 'DESARROLLADOR']);
@@ -56,8 +64,12 @@ class MembersController extends BaseController
 
     public function delete(int $id): ResponseInterface
     {
-        if (!$this->model->find($id)) {
+        $member = $this->model->find($id);
+        if (!$member) {
             return $this->response->setStatusCode(404)->setJSON(['message' => 'Miembro no encontrado']);
+        }
+        if (!ProjectGate::canWrite((int) $member['project_id'])) {
+            return ProjectGate::deny($this->response);
         }
         $this->model->delete($id);
         return $this->response->setStatusCode(204)->setBody('');

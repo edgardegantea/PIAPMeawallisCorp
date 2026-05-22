@@ -28,9 +28,20 @@ export default function RegisterPage() {
       await register(payload);
       navigate('/dashboard');
     } catch (err) {
-      const errors = err?.response?.data?.errors;
-      if (errors) Object.values(errors).forEach((msg) => toast.error(msg));
-      else toast.error(err?.response?.data?.message || 'Error al registrar');
+      console.error('[Register error]', err);
+      if (!err.response) {
+        // Error de red: CORS, servidor caído, URL incorrecta
+        toast.error('No se pudo conectar con el servidor. Verifica tu conexión o intenta más tarde.');
+        return;
+      }
+      const { status, data } = err.response;
+      if (data?.errors) {
+        Object.values(data.errors).forEach((msg) => toast.error(msg));
+      } else if (data?.message) {
+        toast.error(data.message);
+      } else {
+        toast.error(`Error ${status}: no se pudo crear la cuenta`);
+      }
     } finally {
       setLoading(false);
     }

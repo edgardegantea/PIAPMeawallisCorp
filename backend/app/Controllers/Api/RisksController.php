@@ -4,6 +4,7 @@ namespace App\Controllers\Api;
 
 use App\Controllers\BaseController;
 use App\Libraries\ActivityLogger;
+use App\Libraries\ProjectGate;
 use App\Models\RiskModel;
 use CodeIgniter\HTTP\ResponseInterface;
 
@@ -42,6 +43,9 @@ class RisksController extends BaseController
         if (!$this->validate($rules)) {
             return $this->response->setStatusCode(422)->setJSON(['errors' => $this->validator->getErrors()]);
         }
+        if (!ProjectGate::canWrite((int) $data['project_id'])) {
+            return ProjectGate::deny($this->response);
+        }
 
         $id   = $this->model->insert($data);
         $risk = $this->model->find($id);
@@ -59,8 +63,12 @@ class RisksController extends BaseController
 
     public function update(int $id): ResponseInterface
     {
-        if (!$this->model->find($id)) {
+        $risk = $this->model->find($id);
+        if (!$risk) {
             return $this->response->setStatusCode(404)->setJSON(['message' => 'Riesgo no encontrado']);
+        }
+        if (!ProjectGate::canWrite((int) $risk['project_id'])) {
+            return ProjectGate::deny($this->response);
         }
         $data = $this->request->getJSON(true) ?? $this->request->getPost();
         $this->model->update($id, $data);
@@ -69,8 +77,12 @@ class RisksController extends BaseController
 
     public function delete(int $id): ResponseInterface
     {
-        if (!$this->model->find($id)) {
+        $risk = $this->model->find($id);
+        if (!$risk) {
             return $this->response->setStatusCode(404)->setJSON(['message' => 'Riesgo no encontrado']);
+        }
+        if (!ProjectGate::canWrite((int) $risk['project_id'])) {
+            return ProjectGate::deny($this->response);
         }
         $this->model->delete($id);
         return $this->response->setStatusCode(204)->setBody('');

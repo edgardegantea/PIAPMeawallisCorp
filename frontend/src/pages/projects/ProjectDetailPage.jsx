@@ -92,7 +92,11 @@ export default function ProjectDetailPage() {
   if (!project) return <Layout><div className="p-6 text-slate-500">Proyecto no encontrado</div></Layout>;
 
   // ADMIN or project director can manage the project
-  const isManager = authUser?.role === 'ADMIN' || String(authUser?.id) === String(project.director_id);
+  const isManager =
+    authUser?.role === 'ADMIN' ||
+    authUser?.role === 'DIRECTOR' ||
+    String(authUser?.id) === String(project.director_id) ||
+    project.my_project_role === 'PM';
   const tabs = ALL_TABS.filter((t) => isManager || !t.managerOnly);
 
   return (
