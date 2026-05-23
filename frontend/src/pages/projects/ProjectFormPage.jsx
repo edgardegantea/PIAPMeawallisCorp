@@ -183,7 +183,7 @@ export default function ProjectFormPage() {
 
   return (
     <Layout>
-      <div className="p-4 sm:p-6 max-w-4xl">
+      <div className="p-4 sm:p-6">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
           <button onClick={() => navigate(-1)}
