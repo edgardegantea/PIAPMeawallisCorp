@@ -215,7 +215,7 @@ export default function ProfilePage() {
   // ────────────────────────────────────────────────────────────────────────────
   return (
     <Layout>
-      <div className="p-4 sm:p-6 max-w-4xl">
+      <div className="p-4 sm:p-6">
         <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-6">Mi Perfil</h1>
 
         {/* ── Header ──────────────────────────────────────────────────────── */}
@@ -654,7 +654,7 @@ export default function ProfilePage() {
                 Deja los campos vacíos si no deseas cambiar tu contraseña.
               </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Nueva contraseña">
                   <div className="relative">
                     <input type={showPass ? 'text' : 'password'}

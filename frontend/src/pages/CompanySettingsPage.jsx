@@ -66,7 +66,7 @@ export default function CompanySettingsPage() {
 
   return (
     <Layout>
-      <div className="p-4 sm:p-6 max-w-3xl">
+      <div className="p-4 sm:p-6">
         <div className="flex items-center gap-3 mb-6">
           <Building2 size={24} className="text-indigo-600" />
           <div>
