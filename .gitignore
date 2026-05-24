@@ -1,16 +1,36 @@
-# Backend
+# ==========================================
+# Backend (CodeIgniter 4)
+# ==========================================
 backend/vendor/
 backend/.env
-backend/writable/logs/
-backend/writable/cache/
-backend/writable/session/
+
+# Ignorar contenido de writable pero mantener la estructura si es necesario
+backend/writable/logs/*
+backend/writable/cache/*
+backend/writable/session/*
+backend/writable/debugbar/*
+!backend/writable/index.html
+!backend/writable/**/index.html
+
+# Subidas de usuarios (normalmente no se van a producción)
 backend/writable/uploads/
 
-# Frontend
+
+# ==========================================
+# Frontend (Vite / React / Vue)
+# ==========================================
 frontend/node_modules/
 frontend/.env
-# dist/ se rastrea en git para despliegue sin CI/CD
-# frontend/dist/
+frontend/.env.*.local
 
-# macOS
+# Forzar a Git a rastrear la carpeta de compilación para despliegues sin CI/CD
+!frontend/dist/
+
+
+# ==========================================
+# Sistema / IDEs
+# ==========================================
 .DS_Store
+Thumbs.db
+.idea/
+.vscode/
