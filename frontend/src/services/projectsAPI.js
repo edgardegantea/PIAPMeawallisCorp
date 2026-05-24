@@ -146,4 +146,28 @@ export const projectsAPI = {
   // Reportes
   getReportOverview:   ()   => api.get('/reports/overview'),
   getReportProject:    (id) => api.get(`/reports/project/${id}`),
+
+  // Épicas
+  getEpics:    (projectId) => api.get('/epics', { params: { project: projectId } }),
+  createEpic:  (d)         => api.post('/epics', d),
+  updateEpic:  (id, d)     => api.patch(`/epics/${id}`, d),
+  deleteEpic:  (id)        => api.delete(`/epics/${id}`),
+
+  // Impedimentos
+  getImpediments:   (projectId, params) => api.get('/impediments', { params: { project: projectId, ...params } }),
+  createImpediment: (d)                 => api.post('/impediments', d),
+  updateImpediment: (id, d)             => api.patch(`/impediments/${id}`, d),
+  deleteImpediment: (id)                => api.delete(`/impediments/${id}`),
+
+  // Definition of Done
+  getDod:    (projectId)          => api.get(`/projects/${projectId}/dod`),
+  updateDod: (projectId, criteria) => api.put(`/projects/${projectId}/dod`, { criteria }),
+
+  // Sprint Review
+  getSprintReview:    (sprintId) => api.get(`/sprints/${sprintId}/review`),
+  updateSprintReview: (sprintId, d) => api.put(`/sprints/${sprintId}/review`, d),
+
+  // Sprint Retrospectiva
+  getSprintRetro:    (sprintId) => api.get(`/sprints/${sprintId}/retro`),
+  updateSprintRetro: (sprintId, d) => api.put(`/sprints/${sprintId}/retro`, d),
 };

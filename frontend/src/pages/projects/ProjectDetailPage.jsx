@@ -9,7 +9,7 @@ import {
   ArrowLeft, Edit, Trash2, Users, AlertTriangle,
   Zap, ListChecks, FileText, BarChart2, Flag,
   CheckCircle2, Clock, TrendingUp, Calendar, Activity, Layers,
-  ScrollText, BookOpen,
+  ScrollText, BookOpen, Milestone, ShieldAlert, CheckSquare, Clapperboard,
 } from 'lucide-react';
 import SprintList from '../../components/projects/SprintList';
 import BacklogList from '../../components/projects/BacklogList';
@@ -25,6 +25,10 @@ import WorkloadView from '../../components/projects/WorkloadView';
 import ActivityFeed from '../../components/projects/ActivityFeed';
 import ContractList from '../../components/projects/ContractList';
 import TechnicalDocList from '../../components/projects/TechnicalDocList';
+import EpicsList from '../../components/projects/EpicsList';
+import ImpedimentLog from '../../components/projects/ImpedimentLog';
+import DefinitionOfDone from '../../components/projects/DefinitionOfDone';
+import SprintCeremonies from '../../components/projects/SprintCeremonies';
 
 const STATUS_COLORS = {
   INICIACION: 'bg-indigo-100 text-indigo-700', PLANIFICACION: 'bg-purple-100 text-purple-700',
@@ -49,6 +53,11 @@ const ALL_TABS = [
   { id: 'contracts',     label: 'Contratos',         icon: ScrollText,   managerOnly: true  },
   { id: 'technicaldocs', label: 'Docs Técnicos',     icon: BookOpen,     managerOnly: false },
   { id: 'activity',      label: 'Actividad',         icon: Activity,     managerOnly: false },
+  // Scrum
+  { id: 'epics',         label: 'Épicas',            icon: Milestone,    managerOnly: false },
+  { id: 'impediments',   label: 'Impedimentos',      icon: ShieldAlert,  managerOnly: false },
+  { id: 'dod',           label: 'Def. of Done',      icon: CheckSquare,  managerOnly: false },
+  { id: 'ceremonies',    label: 'Ceremonias',        icon: Clapperboard, managerOnly: false },
 ];
 
 export default function ProjectDetailPage() {
@@ -182,6 +191,10 @@ export default function ProjectDetailPage() {
             {tab === 'contracts'     && <ContractList         projectId={id} />}
             {tab === 'technicaldocs' && <TechnicalDocList     projectId={id} isManager={isManager} />}
             {tab === 'activity'      && <ActivityFeed         projectId={id} />}
+            {tab === 'epics'         && <EpicsList            projectId={id} isManager={isManager} />}
+            {tab === 'impediments'   && <ImpedimentLog        projectId={id} isManager={isManager} />}
+            {tab === 'dod'           && <DefinitionOfDone     projectId={id} isManager={isManager} />}
+            {tab === 'ceremonies'    && <SprintCeremonies     projectId={id} isManager={isManager} />}
           </div>
         </div>
       </div>

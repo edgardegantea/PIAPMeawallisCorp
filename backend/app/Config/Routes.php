@@ -184,6 +184,33 @@ $routes->group('api', ['filter' => 'auth'], function ($routes) {
     $routes->post('projects/(:num)/technicaldocs',   'Api\TechnicalDocsController::create/$1');
     $routes->patch('technicaldocs/(:num)',            'Api\TechnicalDocsController::update/$1');
     $routes->delete('technicaldocs/(:num)',           'Api\TechnicalDocsController::delete/$1');
+
+    // Épicas
+    $routes->get('epics',             'Api\EpicsController::index');
+    $routes->post('epics',            'Api\EpicsController::create');
+    $routes->put('epics/(:num)',       'Api\EpicsController::update/$1');
+    $routes->patch('epics/(:num)',     'Api\EpicsController::update/$1');
+    $routes->delete('epics/(:num)',    'Api\EpicsController::delete/$1');
+
+    // Impedimentos
+    $routes->get('impediments',           'Api\ImpedimentsController::index');
+    $routes->post('impediments',          'Api\ImpedimentsController::create');
+    $routes->put('impediments/(:num)',     'Api\ImpedimentsController::update/$1');
+    $routes->patch('impediments/(:num)',   'Api\ImpedimentsController::update/$1');
+    $routes->delete('impediments/(:num)', 'Api\ImpedimentsController::delete/$1');
+
+    // Definition of Done
+    $routes->get('projects/(:num)/dod',   'Api\DefinitionOfDoneController::show/$1');
+    $routes->put('projects/(:num)/dod',   'Api\DefinitionOfDoneController::update/$1');
+    $routes->patch('projects/(:num)/dod', 'Api\DefinitionOfDoneController::update/$1');
+
+    // Sprint Review
+    $routes->get('sprints/(:num)/review', 'Api\SprintReviewController::show/$1');
+    $routes->put('sprints/(:num)/review', 'Api\SprintReviewController::update/$1');
+
+    // Sprint Retrospectiva
+    $routes->get('sprints/(:num)/retro',  'Api\SprintRetrospectiveController::show/$1');
+    $routes->put('sprints/(:num)/retro',  'Api\SprintRetrospectiveController::update/$1');
 });
 
 // Rutas ADMIN (auth + admin filter)
