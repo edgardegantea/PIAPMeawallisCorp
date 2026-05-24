@@ -43,7 +43,7 @@ export default function App() {
         <Route path="/"                 element={<PublicRoute><LoginPage /></PublicRoute>} />
         <Route path="/register"         element={<PublicRoute><RegisterPage /></PublicRoute>} />
         <Route path="/forgot-password"  element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
-        <Route path="/reset-password"   element={<PublicRoute><ResetPasswordPage /></PublicRoute>} />
+        <Route path="/reset-password"   element={<ResetPasswordPage />} />
 
         {/* Protected */}
         <Route path="/dashboard"        element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
