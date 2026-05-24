@@ -234,10 +234,11 @@ class AuthController extends BaseController
         $frontendUrl = rtrim((string)(env('APP_FRONTEND_URL') ?? 'https://piap.maewalliscorp.org'), '/');
         $resetLink   = "{$frontendUrl}/reset-password?token={$token}";
 
-        $emailService = \Config\Services::email();
+        $emailCfg     = config('Email');
+        $emailService = \Config\Services::email($emailCfg);
         $emailService->setFrom(
-            (string)(env('MAIL_FROM_ADDRESS') ?? env('email.fromEmail') ?? 'noreply@maewalliscorp.org'),
-            (string)(env('MAIL_FROM_NAME')    ?? 'PIAP MaeWallisCorp')
+            $emailCfg->fromEmail ?: 'noreply@maewalliscorp.org',
+            $emailCfg->fromName  ?: 'PIAP MaeWallisCorp'
         );
         $emailService->setTo($email);
         $emailService->setSubject('Restablecer contraseña — PIAP');
@@ -254,7 +255,7 @@ class AuthController extends BaseController
         ");
 
         if (!$emailService->send()) {
-            log_message('error', '[ForgotPassword] ' . $emailService->printDebugger(['headers']));
+            log_message('error', '[ForgotPassword] ' . $emailService->printDebugger(['headers', 'subject', 'body', 'smtp_log']));
             return $this->response->setStatusCode(500)
                 ->setJSON(['message' => 'Error al enviar el correo. Intenta más tarde.']);
         }
