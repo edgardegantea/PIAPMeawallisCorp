@@ -6,8 +6,10 @@ use CodeIgniter\Config\BaseConfig;
 
 class Email extends BaseConfig
 {
-    public string $fromEmail  = '';
-    public string $fromName   = '';
+    // Tu correo se mostrará como el remitente principal
+    public string $fromEmail  = 'edgar.degante.a@gmail.com';
+    // Puedes cambiar esto por tu nombre o el de tu sistema
+    public string $fromName   = 'Mi Sistema';
     public string $recipients = '';
 
     /**
@@ -38,21 +40,22 @@ class Email extends BaseConfig
     /**
      * SMTP Username
      */
-    public string $SMTPUser = '';
+    public string $SMTPUser = 'edgar.degante.a@gmail.com';
 
     /**
      * SMTP Password
+     * Aquí colocarás la contraseña de aplicación de 16 caracteres (sin espacios)
      */
-    public string $SMTPPass = '';
+    public string $SMTPPass = 'bdudhlvstpofkbak';
 
     /**
      * SMTP Port
+     * Para TLS en Gmail, el estándar recomendado es el 587
      */
     public int $SMTPPort = 587;
 
     /**
      * SMTP Timeout (in seconds)
-     * Gmail puede tardar hasta 20-30 s en responder; 5 s es insuficiente.
      */
     public int $SMTPTimeout = 30;
 
@@ -63,10 +66,6 @@ class Email extends BaseConfig
 
     /**
      * SMTP Encryption.
-     *
-     * @var string '', 'tls' or 'ssl'. 'tls' will issue a STARTTLS command
-     *             to the server. 'ssl' means implicit SSL. Connection on port
-     *             465 should set this to ''.
      */
     public string $SMTPCrypto = 'tls';
 
@@ -102,6 +101,7 @@ class Email extends BaseConfig
 
     /**
      * Newline character. (Use “\r\n” to comply with RFC 822)
+     * NOTA: En CodeIgniter es vital usar comillas dobles ("\r\n") para que se procese el escape.
      */
     public string $CRLF = "\r\n";
 
