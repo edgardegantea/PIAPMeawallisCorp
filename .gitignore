@@ -23,8 +23,7 @@ frontend/node_modules/
 frontend/.env
 frontend/.env.*.local
 
-# Ignorar la carpeta de compilación (se genera con npm run build en el servidor)
-frontend/dist/
+# frontend/dist/ se sube al repo para desplegar sin Node en el servidor
 
 
 # ==========================================
