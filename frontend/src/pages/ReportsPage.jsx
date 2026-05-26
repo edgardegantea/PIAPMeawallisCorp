@@ -9,7 +9,6 @@ import {
 import {
   FolderKanban, CheckCircle2, AlertTriangle, Clock,
   TrendingUp, DollarSign, Flag, Download, Calendar,
-  Users, ClipboardList,
 } from 'lucide-react';
 
 /* ── helpers ───────────────────────────────────────────────────── */
@@ -126,13 +125,10 @@ export default function ReportsPage() {
       .finally(() => setLoadingRange(false));
   }, []);
 
-  // Load initial range
-  useEffect(() => { loadRange('month', '', ''); }, []);
-
-  // Auto-reload when period changes (except custom)
+  // Carga el período cuando cambia (y también en el montaje inicial porque period empieza en 'month')
   useEffect(() => {
     if (period !== 'custom') loadRange(period, '', '');
-  }, [period]);
+  }, [period, loadRange]);
 
   /* CSV export */
   const exportCSV = () => {
