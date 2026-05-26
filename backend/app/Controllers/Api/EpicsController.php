@@ -6,7 +6,7 @@ use App\Controllers\BaseController;
 use App\Libraries\Auth;
 use App\Libraries\ProjectGate;
 use App\Models\EpicModel;
-use App\Models\BacklogModel;
+use App\Models\BacklogItemModel;
 use CodeIgniter\HTTP\ResponseInterface;
 
 class EpicsController extends BaseController
@@ -29,7 +29,7 @@ class EpicsController extends BaseController
         $epics = $this->model->where('project_id', $projectId)->orderBy('created_at', 'DESC')->findAll();
 
         // Agregar conteo de backlog items por épica
-        $backlogModel = new BacklogModel();
+        $backlogModel = new BacklogItemModel();
         foreach ($epics as &$epic) {
             $epic['backlog_count'] = $backlogModel->where('epic_id', $epic['id'])->countAllResults();
         }
