@@ -15,36 +15,16 @@ class MailService
     // ─── Núcleo ────────────────────────────────────────────────────────────────
 
     /**
-     * Crea una instancia de Email SIEMPRE fresca y correctamente inicializada.
+     * Devuelve una instancia de Email fresca que lee Config/Email.php.
      *
-     * IMPORTANTE para CI4 4.x: Services::email($cfg, true) devuelve la instancia
-     * compartida en caché sin reinicializar — ignora el config. Por eso creamos
-     * la instancia directamente y llamamos initialize() con array explícito.
+     * Services::email(null, FALSE):
+     *   - null  → usa Config\Email.php automáticamente (no hay que duplicar valores)
+     *   - false → crea una instancia nueva, nunca la compartida en caché
+     *             (el bug de CI4: getShared=true ignora el config si ya hay instancia)
      */
     private static function make(): Email
     {
-        $cfg = config('Email');
-
-        $mailer = new Email();
-        $mailer->initialize([
-            'protocol'       => 'smtp',
-            'SMTPHost'       => $cfg->SMTPHost,
-            'SMTPUser'       => $cfg->SMTPUser,
-            'SMTPPass'       => $cfg->SMTPPass,
-            'SMTPPort'       => $cfg->SMTPPort,       // 587
-            'SMTPCrypto'     => $cfg->SMTPCrypto,     // 'tls'
-            'SMTPTimeout'    => $cfg->SMTPTimeout,    // 30
-            'SMTPKeepAlive'  => false,
-            'SMTPAuthMethod' => 'login',
-            'mailType'       => 'html',
-            'charset'        => 'UTF-8',
-            'wordWrap'       => true,
-            'validate'       => false,                // evitar falsos rechazos
-            'newline'        => "\r\n",
-            'CRLF'           => "\r\n",
-        ]);
-
-        return $mailer;
+        return \Config\Services::email(null, false);
     }
 
     /**
@@ -61,15 +41,13 @@ class MailService
             $cfg    = config('Email');
             $mailer = self::make();
 
-            // Nota: el nombre del remitente NO debe contener caracteres no-ASCII
-            // (como el em-dash —) porque corrompe el header MIME en algunos clientes.
-            $mailer->setFrom($cfg->fromEmail, 'PIAP - MaeWallisCorp');
+            $mailer->setFrom($cfg->fromEmail, $cfg->fromName);
             $mailer->setTo($to);
             $mailer->setSubject($subject);
             $mailer->setMessage($htmlBody);
 
             if (! $mailer->send(false)) {
-                // printDebugger() solo acepta: 'headers', 'subject', 'body'
+                // printDebugger() acepta: 'headers', 'subject', 'body'
                 $debug = $mailer->printDebugger(['headers', 'subject']);
                 log_message('error', "[MailService] Fallo al enviar a <{$to}>: {$debug}");
                 return false;
@@ -79,7 +57,7 @@ class MailService
             return true;
 
         } catch (\Throwable $e) {
-            log_message('error', "[MailService] Excepción al enviar a <{$to}>: {$e->getMessage()} en {$e->getFile()}:{$e->getLine()}");
+            log_message('error', "[MailService] Excepcion al enviar a <{$to}>: {$e->getMessage()} en {$e->getFile()}:{$e->getLine()}");
             return false;
         }
     }

@@ -4,7 +4,6 @@ namespace App\Commands;
 
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
-use CodeIgniter\Email\Email;
 
 /**
  * php spark email:test [destino@email.com]
@@ -36,27 +35,10 @@ class EmailTest extends BaseCommand
         CLI::write("Destino : {$para}");
         CLI::write('');
 
-        // Crear instancia fresca directamente (evita shared instance de CI4)
-        $mailer = new Email();
-        $mailer->initialize([
-            'protocol'       => 'smtp',
-            'SMTPHost'       => $cfg->SMTPHost,
-            'SMTPUser'       => $cfg->SMTPUser,
-            'SMTPPass'       => $cfg->SMTPPass,
-            'SMTPPort'       => $cfg->SMTPPort,
-            'SMTPCrypto'     => $cfg->SMTPCrypto,
-            'SMTPTimeout'    => $cfg->SMTPTimeout,
-            'SMTPKeepAlive'  => false,
-            'SMTPAuthMethod' => 'login',
-            'mailType'       => 'html',
-            'charset'        => 'UTF-8',
-            'wordWrap'       => true,
-            'validate'       => false,
-            'newline'        => "\r\n",
-            'CRLF'           => "\r\n",
-        ]);
+        // Instancia fresca desde Config/Email.php (null=usa config, false=no shared)
+        $mailer = \Config\Services::email(null, false);
 
-        $mailer->setFrom($cfg->fromEmail, 'PIAP - MaeWallisCorp');
+        $mailer->setFrom($cfg->fromEmail, $cfg->fromName);
         $mailer->setTo($para);
         $mailer->setSubject('Prueba SMTP - PIAP MaeWallisCorp');
         $mailer->setMessage(
