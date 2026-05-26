@@ -33,8 +33,8 @@ export default function LoginPage() {
             alt="MaeWallisCorp"
             className="h-20 mx-auto mb-4 object-contain rounded-xl"
           />
-          <h1 className="text-2xl font-bold text-slate-800">PIAP v2</h1>
-          <p className="text-slate-500 text-sm mt-1">Plataforma de Gestión de Proyectos</p>
+          <h1 className="text-2xl font-bold text-slate-800">PIAP</h1>
+          <p className="text-slate-500 text-sm mt-1">Plataforma Interna de Administración de Proyectos</p>
         </div>
 
         <form onSubmit={handle} className="space-y-5">
