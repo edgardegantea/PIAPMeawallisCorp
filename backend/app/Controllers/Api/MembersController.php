@@ -4,9 +4,12 @@ namespace App\Controllers\Api;
 
 use App\Controllers\BaseController;
 use App\Libraries\Auth;
+use App\Libraries\MailService;
 use App\Libraries\ProjectGate;
 use App\Models\ProjectMemberModel;
+use App\Models\UserModel;
 use CodeIgniter\HTTP\ResponseInterface;
+use Config\Database;
 
 class MembersController extends BaseController
 {
@@ -81,6 +84,19 @@ class MembersController extends BaseController
 
         $data['assigned_at'] = date('Y-m-d H:i:s');
         $id = $this->model->insert($data);
+
+        // Notificar al usuario recién incorporado (no bloqueante)
+        try {
+            $db      = Database::connect();
+            $invUser = (new UserModel())->find((int) $data['user_id']);
+            $project = $db->table('projects')->select('id, name, code')->where('id', $data['project_id'])->get()->getRowArray();
+            if ($invUser && $project) {
+                MailService::sendProjectInvite($invUser, $project, $data['role'] ?? '');
+            }
+        } catch (\Throwable $e) {
+            log_message('error', '[MembersController] invite email error: ' . $e->getMessage());
+        }
+
         return $this->response->setStatusCode(201)->setJSON($this->model->find($id));
     }
 

@@ -5,6 +5,7 @@ namespace App\Controllers\Api;
 use App\Controllers\BaseController;
 use App\Libraries\Auth;
 use App\Libraries\JWTHandler;
+use App\Libraries\MailService;
 use App\Models\PasswordResetModel;
 use App\Models\RefreshTokenModel;
 use App\Models\UserModel;
@@ -229,94 +230,12 @@ class AuthController extends BaseController
             return $this->response->setJSON(['message' => 'Si el correo existe, recibirás un enlace en breve.']);
         }
 
-        $resetModel = new PasswordResetModel();
-        $token      = $resetModel->generate($email);
+        $resetModel  = new PasswordResetModel();
+        $token       = $resetModel->generate($email);
         $frontendUrl = rtrim((string)(env('APP_FRONTEND_URL') ?? 'https://piap.maewalliscorp.org'), '/');
         $resetLink   = "{$frontendUrl}/reset-password?token={$token}";
 
-        $firstName   = htmlspecialchars($user['first_name'] ?? 'usuario');
-        $resetLinkEsc = htmlspecialchars($resetLink);
-
-        $htmlBody = <<<HTML
-<!DOCTYPE html>
-<html lang="es">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:40px 20px">
-    <tr><td align="center">
-      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08)">
-
-        <!-- Header -->
-        <tr><td style="background:#4f46e5;padding:32px 40px;text-align:center">
-          <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:.5px">
-            PIAP — MaeWallisCorp
-          </h1>
-        </td></tr>
-
-        <!-- Body -->
-        <tr><td style="padding:36px 40px">
-          <p style="margin:0 0 16px;font-size:16px;color:#1e293b">
-            Hola <strong>{$firstName}</strong>,
-          </p>
-          <p style="margin:0 0 16px;font-size:14px;color:#475569;line-height:1.6">
-            Recibimos una solicitud para restablecer la contraseña de tu cuenta en la plataforma <strong>PIAP</strong>. Si fuiste tú, haz clic en el botón de abajo. El enlace es válido por <strong>1 hora</strong>.
-          </p>
-
-          <!-- CTA -->
-          <table cellpadding="0" cellspacing="0" style="margin:28px 0">
-            <tr><td style="background:#4f46e5;border-radius:8px">
-              <a href="{$resetLinkEsc}"
-                 style="display:inline-block;padding:14px 32px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;border-radius:8px">
-                Restablecer contraseña
-              </a>
-            </td></tr>
-          </table>
-
-          <p style="margin:0 0 8px;font-size:13px;color:#64748b;line-height:1.5">
-            Si el botón no funciona, copia y pega este enlace en tu navegador:
-          </p>
-          <p style="margin:0 0 24px;font-size:12px;word-break:break-all">
-            <a href="{$resetLinkEsc}" style="color:#4f46e5">{$resetLinkEsc}</a>
-          </p>
-
-          <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0">
-          <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.5">
-            Si no solicitaste este cambio, ignora este correo. Tu contraseña no será modificada.
-          </p>
-        </td></tr>
-
-        <!-- Footer -->
-        <tr><td style="background:#f8fafc;padding:16px 40px;text-align:center;border-top:1px solid #e2e8f0">
-          <p style="margin:0;font-size:11px;color:#94a3b8">
-            © 2026 MaeWallisCorp · Plataforma Integral de Administración de Proyectos
-          </p>
-        </td></tr>
-
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>
-HTML;
-
-        try {
-            $emailCfg     = config('Email');
-            $emailService = \Config\Services::email($emailCfg);
-            $emailService->setFrom(
-                $emailCfg->fromEmail ?: 'noreply@maewalliscorp.org',
-                $emailCfg->fromName  ?: 'PIAP MaeWallisCorp'
-            );
-            $emailService->setTo($email);
-            $emailService->setSubject('Restablecer tu contraseña — PIAP');
-            $emailService->setMessage($htmlBody);
-
-            if (!$emailService->send()) {
-                log_message('error', '[ForgotPassword] send() failed: ' . $emailService->printDebugger(['headers', 'smtp_log']));
-                return $this->response->setStatusCode(500)
-                    ->setJSON(['message' => 'Error al enviar el correo. Intenta más tarde.']);
-            }
-        } catch (\Throwable $e) {
-            log_message('error', '[ForgotPassword] exception: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+        if (!MailService::sendPasswordReset($user, $resetLink)) {
             return $this->response->setStatusCode(500)
                 ->setJSON(['message' => 'Error al enviar el correo. Intenta más tarde.']);
         }
@@ -355,6 +274,12 @@ HTML;
             ->update();
 
         $resetModel->consume($token);
+
+        // Enviar correo de confirmación (no bloqueante: si falla, la op continúa)
+        $updatedUser = $this->userModel->where('email', $email)->first();
+        if ($updatedUser) {
+            MailService::sendPasswordChanged($updatedUser);
+        }
 
         return $this->response->setJSON(['message' => 'Contraseña actualizada correctamente']);
     }

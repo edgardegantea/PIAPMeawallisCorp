@@ -8,8 +8,8 @@ class Email extends BaseConfig
 {
     // Tu correo se mostrará como el remitente principal
     public string $fromEmail  = 'edgar.degante.a@gmail.com';
-    // Puedes cambiar esto por tu nombre o el de tu sistema
-    public string $fromName   = 'Mi Sistema';
+    // Nombre del remitente que aparecerá en los correos
+    public string $fromName   = 'PIAP — MaeWallisCorp';
     public string $recipients = '';
 
     /**
