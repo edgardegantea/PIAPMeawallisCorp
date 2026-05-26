@@ -1,22 +1,23 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { authAPI } from '../services/api';
-import { toast } from 'sonner';
-import { Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Mail, ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail]     = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent]       = useState(false);
+  const [error, setError]     = useState('');
 
   const handle = async (e) => {
     e.preventDefault();
+    setError('');
     setLoading(true);
     try {
       await authAPI.forgotPassword(email);
       setSent(true);
     } catch (err) {
-      toast.error(err?.response?.data?.message || 'Error al enviar. Intenta más tarde.');
+      setError(err?.response?.data?.message || 'Error al enviar. Intenta más tarde.');
     } finally {
       setLoading(false);
     }
@@ -33,9 +34,9 @@ export default function ForgotPasswordPage() {
             </div>
             <h2 className="text-xl font-bold text-slate-800 mb-2">Revisa tu correo</h2>
             <p className="text-slate-500 text-sm mb-6">
-              Si <strong>{email}</strong> está registrado, recibirás un enlace para restablecer tu contraseña en los próximos minutos.
+              Se envió un enlace de recuperación a <strong>{email}</strong>.
+              Revisa también tu carpeta de spam.
             </p>
-            <p className="text-xs text-slate-400 mb-6">Revisa también tu carpeta de spam.</p>
             <Link to="/" className="text-indigo-600 hover:underline text-sm font-medium flex items-center justify-center gap-2">
               <ArrowLeft size={15} /> Volver al inicio de sesión
             </Link>
@@ -66,11 +67,18 @@ export default function ForgotPasswordPage() {
                     required
                     autoFocus
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => { setEmail(e.target.value); setError(''); }}
                     placeholder="tu@correo.com"
-                    className="w-full border border-slate-300 rounded-lg pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className={`w-full border rounded-lg pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                      error ? 'border-red-400 bg-red-50' : 'border-slate-300'
+                    }`}
                   />
                 </div>
+                {error && (
+                  <p className="flex items-center gap-1 text-xs text-red-500 mt-1.5">
+                    <AlertCircle size={13} /> {error}
+                  </p>
+                )}
               </div>
 
               <button

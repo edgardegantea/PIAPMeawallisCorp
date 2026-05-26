@@ -92,10 +92,16 @@ class AuthController extends BaseController
 
         $user = $this->userModel->findByUsername($data['username']);
 
-        if (! $user || ! password_verify($data['password'], $user['password'])) {
+        if (! $user) {
             $cache->save($lockKey, $fails + 1, self::LOCKOUT_TTL);
             return $this->response->setStatusCode(401)
-                ->setJSON(['message' => 'Credenciales inválidas']);
+                ->setJSON(['message' => 'El usuario no está registrado en el sistema.', 'field' => 'username']);
+        }
+
+        if (! password_verify($data['password'], $user['password'])) {
+            $cache->save($lockKey, $fails + 1, self::LOCKOUT_TTL);
+            return $this->response->setStatusCode(401)
+                ->setJSON(['message' => 'Contraseña incorrecta.', 'field' => 'password']);
         }
 
         if (! $user['is_active']) {
@@ -224,10 +230,10 @@ class AuthController extends BaseController
                 ->setJSON(['message' => 'Correo electrónico inválido']);
         }
 
-        // Siempre responder OK para no revelar si el email existe
         $user = $this->userModel->where('email', $email)->first();
         if (!$user) {
-            return $this->response->setJSON(['message' => 'Si el correo existe, recibirás un enlace en breve.']);
+            return $this->response->setStatusCode(404)
+                ->setJSON(['message' => 'Este correo electrónico no está registrado en el sistema.']);
         }
 
         try {
