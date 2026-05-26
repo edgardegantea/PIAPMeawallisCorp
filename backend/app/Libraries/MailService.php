@@ -16,14 +16,18 @@ class MailService
 
     /**
      * Configuraciones SMTP a intentar en orden.
-     * Muchos servidores Plesk/VPS bloquean el 587 pero permiten el 465.
+     *
+     * 1. Gmail SMTP 587/tls  — configuración principal
+     * 2. Gmail SMTP 465/ssl  — cuando 587 está bloqueado en Plesk
+     * 3. PHP mail()          — último recurso: usa el postfix/sendmail local del servidor,
+     *                          no necesita puertos externos ni credenciales
      */
     private static function smtpConfigs(): array
     {
         $cfg = config('Email');
 
         return [
-            // Intento 1: config principal del archivo Config/Email.php
+            // ── Intento 1: Gmail SMTP 587 TLS ────────────────────────────────
             [
                 'label'      => "{$cfg->SMTPHost}:{$cfg->SMTPPort}/{$cfg->SMTPCrypto}",
                 'protocol'   => 'smtp',
@@ -39,7 +43,7 @@ class MailService
                 'newline'    => "\r\n",
                 'CRLF'       => "\r\n",
             ],
-            // Intento 2: puerto 465 con SSL implícito (alternativa cuando 587 está bloqueado)
+            // ── Intento 2: Gmail SMTP 465 SSL ────────────────────────────────
             [
                 'label'      => "{$cfg->SMTPHost}:465/ssl",
                 'protocol'   => 'smtp',
@@ -54,6 +58,16 @@ class MailService
                 'validate'   => false,
                 'newline'    => "\r\n",
                 'CRLF'       => "\r\n",
+            ],
+            // ── Intento 3: PHP mail() — servidor local (postfix/sendmail Plesk) ──
+            [
+                'label'    => 'php-mail()',
+                'protocol' => 'mail',
+                'mailType' => 'html',
+                'charset'  => 'UTF-8',
+                'validate' => false,
+                'newline'  => "\r\n",
+                'CRLF'     => "\r\n",
             ],
         ];
     }
