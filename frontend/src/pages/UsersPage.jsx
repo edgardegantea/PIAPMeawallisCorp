@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { projectsAPI } from '../services/projectsAPI';
 import { useAuthStore } from '../stores/authStore';
 import Layout from '../components/Layout';
@@ -29,7 +30,13 @@ const EMPTY_FORM = {
 
 export default function UsersPage() {
   const { user: me } = useAuthStore();
+  const navigate = useNavigate();
   const isAdmin = me?.role === 'ADMIN';
+
+  // TEAM_MEMBER has no access to global user management
+  useEffect(() => {
+    if (me?.role === 'TEAM_MEMBER') navigate('/dashboard', { replace: true });
+  }, [me]);
 
   const [users, setUsers]           = useState([]);
   const [search, setSearch]         = useState('');

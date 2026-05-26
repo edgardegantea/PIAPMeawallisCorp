@@ -6,6 +6,7 @@ use App\Controllers\BaseController;
 use App\Libraries\Auth;
 use App\Models\UserModel;
 use CodeIgniter\HTTP\ResponseInterface;
+use Config\Database;
 
 class UsersController extends BaseController
 {
@@ -19,9 +20,43 @@ class UsersController extends BaseController
     /** GET /api/users */
     public function index(): ResponseInterface
     {
-        $search = $this->request->getGet('search');
-        $role   = $this->request->getGet('role');
+        $authUser = Auth::user();
+        $search   = $this->request->getGet('search');
+        $role     = $this->request->getGet('role');
 
+        // TEAM_MEMBER: only see active teammates (users sharing at least one project)
+        if ($authUser['role'] === 'TEAM_MEMBER') {
+            $userId = Auth::id();
+            $db     = Database::connect();
+
+            $sql = "
+                SELECT DISTINCT u.id, u.username, u.email, u.first_name, u.last_name,
+                                u.phone, u.position, u.department, u.role, u.is_active, u.created_at
+                FROM users u
+                INNER JOIN project_members pm_other ON pm_other.user_id = u.id
+                INNER JOIN project_members pm_self  ON pm_self.project_id = pm_other.project_id
+                                                   AND pm_self.user_id = ?
+                WHERE u.is_active = 1
+            ";
+            $params = [$userId];
+
+            if ($search) {
+                $like    = "%{$search}%";
+                $sql    .= " AND (u.username LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR u.email LIKE ?)";
+                $params  = array_merge($params, [$like, $like, $like, $like]);
+            }
+
+            if ($role) {
+                $sql    .= ' AND u.role = ?';
+                $params[] = $role;
+            }
+
+            $sql .= ' ORDER BY u.first_name, u.last_name';
+
+            return $this->response->setJSON($db->query($sql, $params)->getResultArray());
+        }
+
+        // ADMIN / DIRECTOR / PM: full list
         $builder = $this->model->select('id, username, email, first_name, last_name, phone, position, department, role, is_active, created_at');
 
         if ($search) {

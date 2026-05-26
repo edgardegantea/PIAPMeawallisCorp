@@ -353,13 +353,15 @@ export default function DashboardPage() {
                   <Users size={20} className="text-indigo-600" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">Equipo de Trabajo</h2>
+                  <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">
+                    {user?.role === 'TEAM_MEMBER' ? 'Mi Equipo' : 'Equipo de Trabajo'}
+                  </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    {activeMembers.length} activo{activeMembers.length !== 1 ? 's' : ''}
-                    {members.length !== activeMembers.length
+                    {activeMembers.length} miembro{activeMembers.length !== 1 ? 's' : ''}
+                    {user?.role !== 'TEAM_MEMBER' && members.length !== activeMembers.length
                       ? ` · ${members.length - activeMembers.length} inactivo${members.length - activeMembers.length !== 1 ? 's' : ''}`
                       : ''}
-                    {' · '}{members.length} en total
+                    {user?.role !== 'TEAM_MEMBER' && ` · ${members.length} en total`}
                   </p>
                 </div>
               </div>
