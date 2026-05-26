@@ -61,10 +61,14 @@ export default function MyTasksPage() {
   };
 
   // ── Estadísticas rápidas ─────────────────────────────────────────────────────
-  const allActive = tasks; // ya filtradas por el backend
-  const blocked   = allActive.filter((t) => t.status === 'BLOQUEADA').length;
-  const overdue   = allActive.filter((t) => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'COMPLETADA').length;
-  const inProgress = allActive.filter((t) => t.status === 'EN_PROGRESO').length;
+  const allActive   = tasks; // ya filtradas por el backend
+  const blocked     = allActive.filter((t) => t.status === 'BLOQUEADA').length;
+  const overdue     = allActive.filter((t) => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'COMPLETADA').length;
+  const inProgress  = allActive.filter((t) => t.status === 'EN_PROGRESO').length;
+
+  const totalEstimated = tasks.reduce((s, t) => s + parseFloat(t.estimated_hours || 0), 0);
+  const totalLogged    = tasks.reduce((s, t) => s + parseFloat(t.time_logged    || 0), 0);
+  const hoursPct       = totalEstimated > 0 ? Math.min(100, Math.round((totalLogged / totalEstimated) * 100)) : 0;
 
   // ── Agrupar por proyecto ─────────────────────────────────────────────────────
   const grouped = tasks.reduce((acc, t) => {
@@ -108,6 +112,29 @@ export default function MyTasksPage() {
                 <Icon size={12} /> {value} {label}
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Hours summary */}
+        {!loading && tasks.length > 0 && (totalEstimated > 0 || totalLogged > 0) && (
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm px-4 py-3 flex items-center gap-4">
+            <Clock size={16} className="text-indigo-500 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Horas registradas</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  <span className="font-semibold text-slate-800 dark:text-slate-100">{totalLogged.toFixed(1)}h</span>
+                  {totalEstimated > 0 && <span> de {totalEstimated.toFixed(1)}h estimadas ({hoursPct}%)</span>}
+                </span>
+              </div>
+              {totalEstimated > 0 && (
+                <div className="h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full transition-all ${
+                    hoursPct > 100 ? 'bg-red-500' : hoursPct > 80 ? 'bg-amber-500' : 'bg-indigo-500'
+                  }`} style={{ width: `${Math.min(hoursPct, 100)}%` }} />
+                </div>
+              )}
+            </div>
           </div>
         )}
 

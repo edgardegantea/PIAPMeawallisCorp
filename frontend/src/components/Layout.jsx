@@ -33,6 +33,13 @@ export default function Layout({ children }) {
   const [notifCount, setNotifCount]       = useState(0);
   const notifRef = useRef(null);
 
+  // Dismissed alert keys (sessionStorage — resets on tab close)
+  const [dismissedKeys, setDismissedKeys] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('notif_dismissed') || '[]'); } catch { return []; }
+  });
+  const getAlertKey = (n) => `${n.type}:${n.body}`;
+  const unreadCount = notifications.filter((n) => !dismissedKeys.includes(getAlertKey(n))).length;
+
   const [searchQ, setSearchQ]           = useState('');
   const [searchResults, setSearchResults] = useState(null);
   const [searchOpen, setSearchOpen]     = useState(false);
@@ -305,12 +312,20 @@ export default function Layout({ children }) {
 
             {/* Notifications */}
             <div className="relative" ref={notifRef}>
-              <button onClick={() => setNotifOpen(!notifOpen)}
+              <button onClick={() => {
+                  setNotifOpen(!notifOpen);
+                  // Opening the panel marks all current alerts as seen
+                  if (!notifOpen && notifications.length > 0) {
+                    const keys = notifications.map(getAlertKey);
+                    setDismissedKeys(keys);
+                    try { sessionStorage.setItem('notif_dismissed', JSON.stringify(keys)); } catch { /* */ }
+                  }
+                }}
                 className="relative p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
                 <Bell size={17} />
-                {notifCount > 0 && (
+                {unreadCount > 0 && (
                   <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold leading-none">
-                    {notifCount > 9 ? '9+' : notifCount}
+                    {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
               </button>
@@ -331,13 +346,17 @@ export default function Layout({ children }) {
                     ) : (
                       notifications.map((n, i) => {
                         const { icon: NIcon, cls } = SEVERITY_ICON[n.severity] || SEVERITY_ICON.info;
+                        const isNew = !dismissedKeys.includes(getAlertKey(n));
                         return (
                           <Link key={i} to={n.link || '#'}
                             onClick={() => setNotifOpen(false)}
-                            className="flex items-start gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors border-b border-slate-50 dark:border-slate-700 last:border-0">
+                            className={`flex items-start gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors border-b border-slate-50 dark:border-slate-700 last:border-0 ${isNew ? 'bg-red-50/40 dark:bg-red-900/10' : ''}`}>
                             <NIcon size={15} className={`${cls} mt-0.5 flex-shrink-0`} />
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">{n.title}</p>
+                              <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                                {n.title}
+                                {isNew && <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />}
+                              </p>
                               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2">{n.body}</p>
                             </div>
                           </Link>

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { projectsAPI } from '../../services/projectsAPI';
 import Layout from '../../components/Layout';
 import { toast } from 'sonner';
-import { Plus, Search, FolderKanban, Filter, X, Star } from 'lucide-react';
+import { Plus, Search, FolderKanban, Filter, X, Star, User } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 
 const STATUS_COLORS = {
@@ -37,12 +37,15 @@ export default function ProjectsListPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [favorites, setFavorites]   = useState(new Set());
   const [onlyFavs, setOnlyFavs]     = useState(false);
+  const [onlyMine, setOnlyMine]     = useState(false);
+  const [myProjects, setMyProjects] = useState([]);
 
   useEffect(() => {
     projectsAPI.getCategories().then((r) => setCategories(r.data)).catch(() => {});
     projectsAPI.getFavorites().then((r) => {
       setFavorites(new Set((r.data || []).map(Number)));
     }).catch(() => {});
+    projectsAPI.getMyProjects().then((r) => setMyProjects(r.data)).catch(() => {});
   }, []);
 
   const load = useCallback(() => {
@@ -65,7 +68,7 @@ export default function ProjectsListPage() {
   }, [load]);
 
   const clearFilters = () => {
-    setSearch(''); setStatus(''); setCategory(''); setPriority(''); setOnlyFavs(false);
+    setSearch(''); setStatus(''); setCategory(''); setPriority(''); setOnlyFavs(false); setOnlyMine(false);
   };
 
   const toggleFavorite = async (e, projectId) => {
@@ -82,10 +85,22 @@ export default function ProjectsListPage() {
     } catch { toast.error('Error al actualizar favorito'); }
   };
 
-  const hasFilters = search || status || category || priority || onlyFavs;
-  const activeFilterCount = [status, category, priority].filter(Boolean).length + (onlyFavs ? 1 : 0);
+  const hasFilters = search || status || category || priority || onlyFavs || onlyMine;
+  const activeFilterCount = [status, category, priority].filter(Boolean).length + (onlyFavs ? 1 : 0) + (onlyMine ? 1 : 0);
 
-  const visibleProjects = onlyFavs ? projects.filter((p) => favorites.has(Number(p.id))) : projects;
+  // When "Mis Proyectos" is active, filter myProjects client-side; otherwise use server-filtered projects
+  const visibleProjects = (() => {
+    let base = onlyMine ? myProjects : projects;
+    if (onlyFavs) base = base.filter((p) => favorites.has(Number(p.id)));
+    if (onlyMine) {
+      const q = search.toLowerCase();
+      if (q) base = base.filter((p) => p.name.toLowerCase().includes(q) || (p.code || '').toLowerCase().includes(q));
+      if (status)   base = base.filter((p) => p.status === status);
+      if (category) base = base.filter((p) => String(p.category_id) === String(category));
+      if (priority) base = base.filter((p) => p.priority === priority);
+    }
+    return base;
+  })();
 
   return (
     <Layout>
@@ -131,6 +146,13 @@ export default function ProjectsListPage() {
               ${onlyFavs ? 'border-amber-400 bg-amber-50 text-amber-600' : 'border-slate-300 text-slate-500 hover:bg-slate-50'}`}>
             <Star size={15} className={onlyFavs ? 'fill-amber-400 text-amber-400' : ''} />
             Favoritos
+          </button>
+          <button onClick={() => setOnlyMine((v) => !v)}
+            title="Solo mis proyectos"
+            className={`flex items-center gap-1.5 border rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
+              ${onlyMine ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-300 text-slate-500 hover:bg-slate-50'}`}>
+            <User size={15} />
+            Mis Proyectos
           </button>
           {hasFilters && (
             <button onClick={clearFilters}

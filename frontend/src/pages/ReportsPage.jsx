@@ -8,7 +8,7 @@ import {
 } from 'recharts';
 import {
   FolderKanban, CheckCircle2, AlertTriangle, Clock,
-  TrendingUp, DollarSign, Users, Flag,
+  TrendingUp, DollarSign, Users, Flag, Download,
 } from 'lucide-react';
 
 const STATUS_COLORS = {
@@ -85,12 +85,58 @@ export default function ReportsPage() {
     ? Math.round((t.completadas / t.total) * 100)
     : 0;
 
+  const exportCSV = () => {
+    if (!data) return;
+    const rows = [
+      ['Tipo', 'Métrica', 'Valor'],
+      ['Proyectos', 'Total', p.total ?? 0],
+      ['Proyectos', 'En Ejecución', p.en_ejecucion ?? 0],
+      ['Proyectos', 'Vencidos', p.vencidos ?? 0],
+      ['Proyectos', 'Avance Promedio', `${p.avance_promedio ?? 0}%`],
+      ['Tareas', 'Total', t.total ?? 0],
+      ['Tareas', 'Completadas', t.completadas ?? 0],
+      ['Tareas', 'Bloqueadas', t.bloqueadas ?? 0],
+      ['Tareas', 'Vencidas', t.vencidas ?? 0],
+      ['Tareas', 'Horas Estimadas', `${parseFloat(t.horas_estimadas || 0).toFixed(1)}h`],
+      ['Tareas', 'Horas Registradas', `${parseFloat(t.horas_registradas || 0).toFixed(1)}h`],
+      ['Presupuesto', 'Total Planeado', Number(p.presupuesto_total || 0)],
+      ['Presupuesto', 'Ejecutado', Number(p.presupuesto_ejecutado || 0)],
+      ['Presupuesto', 'Porcentaje Ejecutado', `${budgetUsed}%`],
+      ['Riesgos', 'Total', r.total ?? 0],
+      ['Riesgos', 'Críticos Activos', r.criticos ?? 0],
+      ['Riesgos', 'Activos', r.activos ?? 0],
+      ['Riesgos', 'Mitigados', r.mitigados ?? 0],
+      ['Incidencias', 'Total', inc.total ?? 0],
+      ['Incidencias', 'Críticas', inc.criticas ?? 0],
+      ['Incidencias', 'Abiertas', inc.abiertas ?? 0],
+      ['Hitos', 'Total', m.total ?? 0],
+      ['Hitos', 'Completados', m.completados ?? 0],
+      ['Hitos', 'Vencidos', m.vencidos ?? 0],
+    ];
+    const csv = '﻿' + rows.map((row) => row.map((c) => `"${c}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `reporte_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <Layout>
       <div className="p-4 sm:p-6 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Reportes y Análisis</h1>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Resumen ejecutivo de toda la organización</p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Reportes y Análisis</h1>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Resumen ejecutivo de toda la organización</p>
+          </div>
+          <button onClick={exportCSV}
+            className="flex items-center gap-2 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm font-medium px-3 py-2 rounded-lg transition-colors flex-shrink-0">
+            <Download size={14} /> Exportar CSV
+          </button>
         </div>
 
         {/* KPI grid */}

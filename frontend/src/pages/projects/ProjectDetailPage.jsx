@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { projectsAPI } from '../../services/projectsAPI';
 import Layout from '../../components/Layout';
 import { toast } from 'sonner';
@@ -38,6 +38,12 @@ const STATUS_COLORS = {
   CANCELADO:  'bg-red-100 text-red-700',
 };
 
+const STATUS_LABELS = {
+  INICIACION: 'Iniciación', PLANIFICACION: 'Planificación', EJECUCION: 'Ejecución',
+  MONITOREO: 'Monitoreo', CIERRE: 'Cierre', PAUSADO: 'Pausado', CANCELADO: 'Cancelado',
+};
+const STATUSES = Object.keys(STATUS_COLORS);
+
 const ALL_TABS = [
   { id: 'overview',      label: 'Resumen',          icon: BarChart2,    managerOnly: false },
   { id: 'sprints',       label: 'Sprints',           icon: Zap,          managerOnly: false },
@@ -64,10 +70,11 @@ const ALL_TABS = [
 export default function ProjectDetailPage() {
   const { id }     = useParams();
   const navigate   = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const authUser   = useAuthStore((s) => s.user);
   const [project, setProject]   = useState(null);
   const [report, setReport]     = useState(null);
-  const [tab, setTab]           = useState('overview');
+  const [tab, setTab]           = useState(searchParams.get('tab') || 'overview');
   const [loading, setLoading]   = useState(true);
   const [confirm, setConfirm]   = useState(null);
 
@@ -109,6 +116,23 @@ export default function ProjectDetailPage() {
     project.my_project_role === 'PM';
   const tabs = ALL_TABS.filter((t) => isManager || !t.managerOnly);
 
+  // Sync tab from URL — validate once project (and isManager) is known
+  useEffect(() => {
+    const urlTab = searchParams.get('tab');
+    if (urlTab && tabs.find((t) => t.id === urlTab)) {
+      setTab(urlTab);
+    } else if (urlTab && !tabs.find((t) => t.id === urlTab)) {
+      // tab not accessible (e.g. manager-only) — fall back to overview
+      setTab('overview');
+      setSearchParams({}, { replace: true });
+    }
+  }, [project]);
+
+  const changeTab = (tid) => {
+    setTab(tid);
+    setSearchParams({ tab: tid }, { replace: true });
+  };
+
   return (
     <Layout>
       <div className="p-4 sm:p-6">
@@ -121,9 +145,29 @@ export default function ProjectDetailPage() {
             <div>
               <div className="flex items-center gap-3">
                 <span className="text-xs font-mono text-slate-400 dark:text-slate-500">{project.code}</span>
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[project.status]}`}>
-                  {project.status}
-                </span>
+                {isManager ? (
+                  <select
+                    value={project.status}
+                    onChange={async (e) => {
+                      const newStatus = e.target.value;
+                      try {
+                        await projectsAPI.updateProject(project.id, { status: newStatus });
+                        toast.success(`Estado: ${STATUS_LABELS[newStatus] || newStatus}`);
+                        loadProject();
+                      } catch { toast.error('Error al cambiar estado'); }
+                    }}
+                    className={`text-xs font-medium px-2 py-0.5 rounded-full border-0 cursor-pointer
+                      focus:outline-none focus:ring-2 focus:ring-indigo-400 appearance-none
+                      ${STATUS_COLORS[project.status]}`}>
+                    {STATUSES.map((s) => (
+                      <option key={s} value={s}>{STATUS_LABELS[s] || s}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[project.status]}`}>
+                    {STATUS_LABELS[project.status] || project.status}
+                  </span>
+                )}
               </div>
               <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100 mt-0.5">{project.name}</h1>
               <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
@@ -174,7 +218,7 @@ export default function ProjectDetailPage() {
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm">
           <div className="flex overflow-x-auto border-b border-slate-100 dark:border-slate-700">
             {tabs.map(({ id: tid, label }) => (
-              <button key={tid} onClick={() => setTab(tid)}
+              <button key={tid} onClick={() => changeTab(tid)}
                 className={`px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0
                   ${tab === tid ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
                 {label}
