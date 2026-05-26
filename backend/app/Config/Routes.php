@@ -174,6 +174,9 @@ $routes->group('api', ['filter' => 'auth'], function ($routes) {
     // Global Search
     $routes->get('search',                     'Api\SearchController::index');
 
+    // Calendar (tasks + milestones by month for current user)
+    $routes->get('calendar',                   'Api\CalendarController::index');
+
     // Contratos de proyecto
     $routes->get('projects/(:num)/contracts',    'Api\ContractsController::index/$1');
     $routes->post('projects/(:num)/contracts',   'Api\ContractsController::create/$1');

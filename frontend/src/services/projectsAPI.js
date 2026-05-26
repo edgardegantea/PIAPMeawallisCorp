@@ -141,6 +141,9 @@ export const projectsAPI = {
   getCompanySettings:    ()  => api.get('/company-settings'),
   updateCompanySettings: (d) => api.patch('/company-settings', d),
 
+  // Calendario
+  getCalendar: (year, month) => api.get('/calendar', { params: { year, month } }),
+
   // Notificaciones
   getNotifications: () => api.get('/notifications'),
 

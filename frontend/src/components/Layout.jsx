@@ -7,7 +7,7 @@ import {
   LayoutDashboard, FolderKanban, Tag, User, LogOut,
   Menu, X, ChevronRight, BarChart2, Building2, Shield, Lock,
   Bell, AlertTriangle, Clock, Flag, Search, CheckSquare,
-  Sun, Moon, ListTodo,
+  Sun, Moon, ListTodo, CalendarDays,
 } from 'lucide-react';
 
 const SEVERITY_ICON = {
@@ -108,10 +108,11 @@ export default function Layout({ children }) {
 
   const sections = [
     navSection('Principal', [
-      { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard'  },
-      { to: '/projects',  icon: FolderKanban,    label: 'Proyectos'  },
-      { to: '/my-tasks',  icon: ListTodo,         label: 'Mis Tareas' },
-      { to: '/reports',   icon: BarChart2,        label: 'Reportes'  },
+      { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard'   },
+      { to: '/projects',  icon: FolderKanban,    label: 'Proyectos'   },
+      { to: '/my-tasks',  icon: ListTodo,         label: 'Mis Tareas'  },
+      { to: '/calendar',  icon: CalendarDays,     label: 'Calendario'  },
+      { to: '/reports',   icon: BarChart2,        label: 'Reportes'   },
     ]),
     navSection('Catálogos', [
       { to: '/categories', icon: Tag, label: 'Categorías' },

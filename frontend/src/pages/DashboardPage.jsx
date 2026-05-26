@@ -9,7 +9,8 @@ import {
   FolderKanban, CheckCircle, AlertTriangle, TrendingUp, Zap,
   Users, UserPlus, Search, Edit2, UserX, UserCheck, X, Save,
   Eye, EyeOff, Shield, Briefcase, Building2, Phone, Mail,
-  ChevronUp, ChevronDown, ChevronsUpDown,
+  ChevronUp, ChevronDown, ChevronsUpDown, CalendarDays, Clock,
+  ListTodo,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -53,6 +54,10 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState([]);
   const [velocity, setVelocity] = useState([]);
   const [dashLoading, setDashLoading] = useState(true);
+
+  // ── Upcoming tasks (next 7 days) ─────────────────────────
+  const [upcoming, setUpcoming]         = useState([]);
+  const [upcomingLoading, setUpcomingLoading] = useState(true);
 
   // ── Team ─────────────────────────────────────────────────
   const [members, setMembers]         = useState([]);
@@ -103,6 +108,21 @@ export default function DashboardPage() {
     }).finally(() => setDashLoading(false));
 
     loadTeam('', '');
+
+    // Upcoming tasks (next 7 days)
+    projectsAPI.getMyTasks({})
+      .then((r) => {
+        const today7 = new Date();
+        today7.setDate(today7.getDate() + 7);
+        today7.setHours(23, 59, 59, 999);
+        const filtered = (r.data || [])
+          .filter((t) => t.due_date && new Date(t.due_date) <= today7)
+          .sort((a, b) => a.due_date.localeCompare(b.due_date))
+          .slice(0, 8);
+        setUpcoming(filtered);
+      })
+      .catch(() => {})
+      .finally(() => setUpcomingLoading(false));
   }, []);
 
   // Debounce search
@@ -339,6 +359,68 @@ export default function DashboardPage() {
             </div>
           </>
         )}
+
+        {/* ── Próximos vencimientos ────────────────────── */}
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <CalendarDays size={16} className="text-indigo-500" />
+              <h2 className="text-base font-semibold text-slate-700 dark:text-slate-200">
+                Próximos Vencimientos
+              </h2>
+            </div>
+            <Link to="/my-tasks"
+              className="text-xs text-indigo-600 hover:underline flex items-center gap-1">
+              <ListTodo size={12} /> Ver todas →
+            </Link>
+          </div>
+          {upcomingLoading ? (
+            <p className="text-slate-400 text-sm text-center py-6">Cargando...</p>
+          ) : upcoming.length === 0 ? (
+            <div className="text-center py-6">
+              <CheckCircle size={32} className="mx-auto text-emerald-300 mb-2" />
+              <p className="text-slate-500 text-sm">Sin tareas con vencimiento en los próximos 7 días 🎉</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-50 dark:divide-slate-700">
+              {upcoming.map((t) => {
+                const dueDate  = new Date(t.due_date);
+                const today0   = new Date(); today0.setHours(0,0,0,0);
+                const diffDays = Math.ceil((dueDate - today0) / 86400000);
+                const isOverdue = diffDays < 0;
+                const isDueToday = diffDays === 0;
+                const isDueSoon  = diffDays <= 2 && diffDays >= 0;
+
+                return (
+                  <Link key={t.id}
+                    to={`/projects/${t.project_id}?tab=kanban`}
+                    className="flex items-center gap-3 py-2.5 px-1 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg transition-colors">
+                    {/* Due badge */}
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap ${
+                      isOverdue  ? 'bg-red-100 text-red-700'
+                      : isDueToday ? 'bg-amber-100 text-amber-700'
+                      : isDueSoon  ? 'bg-orange-100 text-orange-700'
+                      : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {isOverdue
+                        ? `${Math.abs(diffDays)}d vencida`
+                        : isDueToday ? 'Hoy'
+                        : `${diffDays}d`}
+                    </span>
+                    {/* Task title */}
+                    <span className="flex-1 text-sm text-slate-700 dark:text-slate-200 truncate">
+                      {t.title}
+                    </span>
+                    {/* Project */}
+                    <span className="text-xs text-slate-400 font-mono flex-shrink-0">
+                      {t.project_code}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         {/* ════════════════════════════════════════════════
             SECCIÓN: GESTIÓN DEL EQUIPO

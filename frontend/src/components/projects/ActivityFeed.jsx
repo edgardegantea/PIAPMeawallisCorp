@@ -30,15 +30,24 @@ function timeSince(dateStr) {
   return new Date(dateStr).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
 }
 
+const ACTION_GROUPS = [
+  { key: 'all',       label: 'Todo' },
+  { key: 'tasks',     label: 'Tareas',      match: (a) => a?.startsWith('task_')      },
+  { key: 'milestones',label: 'Hitos',       match: (a) => a?.startsWith('milestone_') },
+  { key: 'risks',     label: 'Riesgos',     match: (a) => a?.startsWith('risk_')      },
+  { key: 'incidents', label: 'Incidencias', match: (a) => a?.startsWith('incident_')  },
+];
+
 export default function ActivityFeed({ projectId }) {
   const authUser = useAuthStore((s) => s.user);
 
-  const [items, setItems]       = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [page, setPage]         = useState(1);
-  const [editingId, setEditingId] = useState(null);
-  const [editText, setEditText]   = useState('');
-  const [saving, setSaving]       = useState(false);
+  const [items, setItems]           = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [page, setPage]             = useState(1);
+  const [editingId, setEditingId]   = useState(null);
+  const [editText, setEditText]     = useState('');
+  const [saving, setSaving]         = useState(false);
+  const [actionFilter, setActionFilter] = useState('all');
   const PER_PAGE = 15;
 
   const load = () => {
@@ -99,20 +108,50 @@ export default function ActivityFeed({ projectId }) {
     );
   }
 
-  const paginated = items.slice(0, page * PER_PAGE);
-  const hasMore   = paginated.length < items.length;
+  const activeGroup = ACTION_GROUPS.find((g) => g.key === actionFilter);
+  const filtered = actionFilter === 'all'
+    ? items
+    : items.filter((it) => activeGroup?.match(it.action));
+
+  const paginated = filtered.slice(0, page * PER_PAGE);
+  const hasMore   = paginated.length < filtered.length;
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm overflow-hidden">
-      <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Activity size={18} className="text-indigo-500" />
-          <h3 className="font-semibold text-slate-700 dark:text-slate-200">Actividad del Proyecto</h3>
-          <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-full">{items.length}</span>
+      <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Activity size={18} className="text-indigo-500" />
+            <h3 className="font-semibold text-slate-700 dark:text-slate-200">Actividad del Proyecto</h3>
+            <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-full">
+              {filtered.length}{actionFilter !== 'all' && `/${items.length}`}
+            </span>
+          </div>
+          <button onClick={load}
+            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            title="Actualizar">
+            <RefreshCw size={14} />
+          </button>
         </div>
-        <button onClick={load} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors" title="Actualizar">
-          <RefreshCw size={14} />
-        </button>
+        {/* Action-type filter chips */}
+        <div className="flex gap-1.5 flex-wrap">
+          {ACTION_GROUPS.map((g) => {
+            const count = g.key === 'all' ? items.length : items.filter((it) => g.match?.(it.action)).length;
+            if (g.key !== 'all' && count === 0) return null;
+            return (
+              <button key={g.key}
+                onClick={() => { setActionFilter(g.key); setPage(1); }}
+                className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
+                  actionFilter === g.key
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                }`}>
+                {g.label}
+                {g.key !== 'all' && <span className="ml-1 opacity-70">{count}</span>}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className="divide-y divide-slate-50 dark:divide-slate-700">
@@ -199,7 +238,7 @@ export default function ActivityFeed({ projectId }) {
         <div className="px-5 py-4 border-t border-slate-100 dark:border-slate-700 text-center">
           <button onClick={() => setPage((p) => p + 1)}
             className="text-sm text-indigo-600 hover:text-indigo-700 font-medium hover:underline">
-            Cargar más ({items.length - paginated.length} restantes)
+            Cargar más ({filtered.length - paginated.length} restantes)
           </button>
         </div>
       )}
