@@ -80,19 +80,29 @@ class EmailDiagnose extends BaseCommand
             $allOk = false;
         }
 
-        // ── 4. Conectividad TCP al servidor SMTP ──────────────────────────────
+        // ── 4. Conectividad TCP al servidor SMTP (prueba ambos puertos) ──────
         CLI::write('');
-        CLI::write("4. Conectividad TCP a {$cfg->SMTPHost}:{$cfg->SMTPPort}", 'yellow');
-        $errno  = 0;
-        $errstr = '';
-        $sock   = @fsockopen($cfg->SMTPHost, $cfg->SMTPPort, $errno, $errstr, 10);
-        if ($sock) {
-            fclose($sock);
-            CLI::write('   ✅ Puerto alcanzable', 'green');
-        } else {
-            CLI::write("   ❌ No se pudo conectar: [{$errno}] {$errstr}", 'red');
-            CLI::write('   → El firewall del servidor bloquea el puerto ' . $cfg->SMTPPort, 'light_gray');
-            CLI::write('   → Solución: abre el puerto en Plesk Firewall o usa puerto 465/ssl', 'light_gray');
+        CLI::write("4. Conectividad TCP a {$cfg->SMTPHost}", 'yellow');
+
+        $ports = [
+            [$cfg->SMTPPort, $cfg->SMTPCrypto],
+            [($cfg->SMTPPort === 587 ? 465 : 587), ($cfg->SMTPPort === 587 ? 'ssl' : 'tls')],
+        ];
+        $anyPortOk = false;
+        foreach ($ports as [$port, $crypto]) {
+            $errno  = 0; $errstr = '';
+            $sock   = @fsockopen($cfg->SMTPHost, $port, $errno, $errstr, 8);
+            if ($sock) {
+                fclose($sock);
+                CLI::write("   ✅ Puerto {$port}/{$crypto} — alcanzable", 'green');
+                $anyPortOk = true;
+            } else {
+                CLI::write("   ❌ Puerto {$port}/{$crypto} — bloqueado: [{$errno}] {$errstr}", 'red');
+            }
+        }
+        if (!$anyPortOk) {
+            CLI::write('   → El firewall bloquea ambos puertos SMTP', 'light_gray');
+            CLI::write('   → Abre el puerto 465 en Plesk Firewall > Outgoing rules', 'light_gray');
             $allOk = false;
         }
 

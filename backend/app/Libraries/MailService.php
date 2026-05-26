@@ -15,20 +15,53 @@ class MailService
     // ─── Núcleo ────────────────────────────────────────────────────────────────
 
     /**
-     * Devuelve una instancia de Email fresca que lee Config/Email.php.
-     *
-     * Services::email(null, FALSE):
-     *   - null  → usa Config\Email.php automáticamente (no hay que duplicar valores)
-     *   - false → crea una instancia nueva, nunca la compartida en caché
-     *             (el bug de CI4: getShared=true ignora el config si ya hay instancia)
+     * Configuraciones SMTP a intentar en orden.
+     * Muchos servidores Plesk/VPS bloquean el 587 pero permiten el 465.
      */
-    private static function make(): Email
+    private static function smtpConfigs(): array
     {
-        return \Config\Services::email(null, false);
+        $cfg = config('Email');
+
+        return [
+            // Intento 1: config principal del archivo Config/Email.php
+            [
+                'label'      => "{$cfg->SMTPHost}:{$cfg->SMTPPort}/{$cfg->SMTPCrypto}",
+                'protocol'   => 'smtp',
+                'SMTPHost'   => $cfg->SMTPHost,
+                'SMTPUser'   => $cfg->SMTPUser,
+                'SMTPPass'   => $cfg->SMTPPass,
+                'SMTPPort'   => $cfg->SMTPPort,
+                'SMTPCrypto' => $cfg->SMTPCrypto,
+                'SMTPTimeout'=> $cfg->SMTPTimeout,
+                'mailType'   => 'html',
+                'charset'    => 'UTF-8',
+                'validate'   => false,
+                'newline'    => "\r\n",
+                'CRLF'       => "\r\n",
+            ],
+            // Intento 2: puerto 465 con SSL implícito (alternativa cuando 587 está bloqueado)
+            [
+                'label'      => "{$cfg->SMTPHost}:465/ssl",
+                'protocol'   => 'smtp',
+                'SMTPHost'   => $cfg->SMTPHost,
+                'SMTPUser'   => $cfg->SMTPUser,
+                'SMTPPass'   => $cfg->SMTPPass,
+                'SMTPPort'   => 465,
+                'SMTPCrypto' => 'ssl',
+                'SMTPTimeout'=> $cfg->SMTPTimeout,
+                'mailType'   => 'html',
+                'charset'    => 'UTF-8',
+                'validate'   => false,
+                'newline'    => "\r\n",
+                'CRLF'       => "\r\n",
+            ],
+        ];
     }
 
     /**
-     * Envía un correo HTML.
+     * Envía un correo HTML intentando múltiples configuraciones SMTP.
+     * Si la configuración principal falla (ej. puerto bloqueado en Plesk),
+     * reintenta automáticamente con el puerto alternativo.
      *
      * @param  string $to       Dirección de destino
      * @param  string $subject  Asunto del correo
@@ -37,29 +70,39 @@ class MailService
      */
     public static function send(string $to, string $subject, string $htmlBody): bool
     {
-        try {
-            $cfg    = config('Email');
-            $mailer = self::make();
+        $cfg      = config('Email');
+        $configs  = self::smtpConfigs();
+        $lastDebug = '';
 
-            $mailer->setFrom($cfg->fromEmail, $cfg->fromName);
-            $mailer->setTo($to);
-            $mailer->setSubject($subject);
-            $mailer->setMessage($htmlBody);
+        foreach ($configs as $smtpConfig) {
+            $label = $smtpConfig['label'];
+            unset($smtpConfig['label']);
 
-            if (! $mailer->send(false)) {
-                // printDebugger() acepta: 'headers', 'subject', 'body'
-                $debug = $mailer->printDebugger(['headers', 'subject']);
-                log_message('error', "[MailService] Fallo al enviar a <{$to}>: {$debug}");
-                return false;
+            try {
+                $mailer = new Email();
+                $mailer->initialize($smtpConfig);
+
+                $mailer->setFrom($cfg->fromEmail, $cfg->fromName);
+                $mailer->setTo($to);
+                $mailer->setSubject($subject);
+                $mailer->setMessage($htmlBody);
+
+                if ($mailer->send(false)) {
+                    log_message('info', "[MailService] Correo enviado a <{$to}> via {$label}: {$subject}");
+                    return true;
+                }
+
+                $lastDebug = $mailer->printDebugger(['headers', 'subject']);
+                log_message('warning', "[MailService] Fallo con {$label}: {$lastDebug}");
+
+            } catch (\Throwable $e) {
+                $lastDebug = $e->getMessage();
+                log_message('warning', "[MailService] Excepcion con {$label}: {$e->getMessage()}");
             }
-
-            log_message('info', "[MailService] Correo enviado a <{$to}>: {$subject}");
-            return true;
-
-        } catch (\Throwable $e) {
-            log_message('error', "[MailService] Excepcion al enviar a <{$to}>: {$e->getMessage()} en {$e->getFile()}:{$e->getLine()}");
-            return false;
         }
+
+        log_message('error', "[MailService] Todos los intentos SMTP fallaron para <{$to}>. Ultimo error: {$lastDebug}");
+        return false;
     }
 
     // ─── Plantillas transaccionales ───────────────────────────────────────────
