@@ -91,6 +91,25 @@ export default function ProjectDetailPage() {
 
   useEffect(() => { loadProject(); }, [id]);
 
+  // ⚠️ Este efecto DEBE estar antes de cualquier early return para que React
+  // siempre ejecute el mismo número de hooks independientemente del estado.
+  useEffect(() => {
+    if (!project) return; // no-op hasta que el proyecto cargue
+    const localIsManager =
+      authUser?.role === 'ADMIN' ||
+      authUser?.role === 'DIRECTOR' ||
+      String(authUser?.id) === String(project.director_id) ||
+      project.my_project_role === 'PM';
+    const localTabs = ALL_TABS.filter((t) => localIsManager || !t.managerOnly);
+    const urlTab = searchParams.get('tab');
+    if (urlTab && localTabs.find((t) => t.id === urlTab)) {
+      setTab(urlTab);
+    } else if (urlTab && !localTabs.find((t) => t.id === urlTab)) {
+      setTab('overview');
+      setSearchParams({}, { replace: true });
+    }
+  }, [project]);
+
   const handleDelete = () => {
     setConfirm({
       title: 'Eliminar proyecto',
@@ -115,18 +134,6 @@ export default function ProjectDetailPage() {
     String(authUser?.id) === String(project.director_id) ||
     project.my_project_role === 'PM';
   const tabs = ALL_TABS.filter((t) => isManager || !t.managerOnly);
-
-  // Sync tab from URL — validate once project (and isManager) is known
-  useEffect(() => {
-    const urlTab = searchParams.get('tab');
-    if (urlTab && tabs.find((t) => t.id === urlTab)) {
-      setTab(urlTab);
-    } else if (urlTab && !tabs.find((t) => t.id === urlTab)) {
-      // tab not accessible (e.g. manager-only) — fall back to overview
-      setTab('overview');
-      setSearchParams({}, { replace: true });
-    }
-  }, [project]);
 
   const changeTab = (tid) => {
     setTab(tid);
