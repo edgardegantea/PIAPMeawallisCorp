@@ -10,6 +10,7 @@ import {
   Zap, ListChecks, FileText, BarChart2, Flag,
   CheckCircle2, Clock, TrendingUp, Calendar, Activity, Layers,
   ScrollText, BookOpen, Milestone, ShieldAlert, CheckSquare, Clapperboard,
+  DollarSign,
 } from 'lucide-react';
 import SprintList from '../../components/projects/SprintList';
 import BacklogList from '../../components/projects/BacklogList';
@@ -158,7 +159,13 @@ export default function ProjectDetailPage() {
             <div><span className="font-medium text-slate-700">Inicio:</span> {project.planned_start_date}</div>
             <div><span className="font-medium text-slate-700">Fin planeado:</span> {project.planned_end_date}</div>
             {isManager && (
-              <div><span className="font-medium text-slate-700">Presupuesto:</span> ${Number(project.planned_budget).toLocaleString()}</div>
+              <div>
+                <span className="font-medium text-slate-700">Presupuesto:</span>{' '}
+                ${Number(project.planned_budget || 0).toLocaleString()}
+                {project.actual_budget > 0 && (
+                  <span className="text-slate-400"> · Ejecutado: ${Number(project.actual_budget).toLocaleString()}</span>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -184,11 +191,11 @@ export default function ProjectDetailPage() {
             {tab === 'timeline'      && <GanttView           projectId={id} project={project} />}
             {tab === 'milestones'    && <MilestoneList        projectId={id} isManager={isManager} />}
             {tab === 'workload'      && <WorkloadView         projectId={id} />}
-            {tab === 'risks'         && <RiskList             projectId={id} />}
-            {tab === 'incidents'     && <IncidentList         projectId={id} />}
+            {tab === 'risks'         && <RiskList             projectId={id} isManager={isManager} />}
+            {tab === 'incidents'     && <IncidentList         projectId={id} isManager={isManager} />}
             {tab === 'members'       && <MemberList           projectId={id} isManager={isManager} />}
             {tab === 'documents'     && <DocumentList         projectId={id} isManager={isManager} />}
-            {tab === 'contracts'     && <ContractList         projectId={id} />}
+            {tab === 'contracts'     && <ContractList         projectId={id} isManager={isManager} />}
             {tab === 'technicaldocs' && <TechnicalDocList     projectId={id} isManager={isManager} />}
             {tab === 'activity'      && <ActivityFeed         projectId={id} />}
             {tab === 'epics'         && <EpicsList            projectId={id} isManager={isManager} />}
@@ -221,6 +228,21 @@ function ProjectOverview({ project, report, reload, isManager }) {
   const ts  = report?.task_stats || {};
   const spr = report?.sprints    || [];
   const activeSprint = spr.find((s) => s.status === 'ACTIVO');
+
+  // Days remaining calculation
+  const today        = new Date();
+  today.setHours(0, 0, 0, 0);
+  const endDate      = project.planned_end_date ? new Date(project.planned_end_date) : null;
+  const startDate    = project.planned_start_date ? new Date(project.planned_start_date) : null;
+  const daysLeft     = endDate ? Math.ceil((endDate - today) / 86400000) : null;
+  const totalDays    = (startDate && endDate) ? Math.ceil((endDate - startDate) / 86400000) : null;
+  const daysElapsed  = (startDate && today > startDate) ? Math.ceil((today - startDate) / 86400000) : 0;
+  const timeProgress = totalDays && totalDays > 0 ? Math.min(100, Math.round((daysElapsed / totalDays) * 100)) : 0;
+
+  // Budget
+  const plannedBudget  = parseFloat(project.planned_budget  || 0);
+  const executedBudget = parseFloat(project.actual_budget || 0);
+  const budgetPct      = plannedBudget > 0 ? Math.min(100, Math.round((executedBudget / plannedBudget) * 100)) : 0;
 
   return (
     <div className="space-y-6">
@@ -282,6 +304,66 @@ function ProjectOverview({ project, report, reload, isManager }) {
           </div>
         </div>
       )}
+
+      {/* Timeline + Budget row */}
+      <div className="grid md:grid-cols-2 gap-4">
+        {/* Timeline */}
+        {totalDays !== null && (
+          <div className="bg-slate-50 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                <Calendar size={13} className="text-indigo-500" /> Línea de Tiempo
+              </h3>
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                daysLeft === null ? 'bg-slate-100 text-slate-500'
+                : daysLeft < 0  ? 'bg-red-100 text-red-700'
+                : daysLeft <= 7  ? 'bg-amber-100 text-amber-700'
+                : 'bg-emerald-100 text-emerald-700'
+              }`}>
+                {daysLeft === null ? '—'
+                  : daysLeft < 0  ? `Vencido hace ${Math.abs(daysLeft)}d`
+                  : daysLeft === 0 ? 'Vence hoy'
+                  : `${daysLeft} días restantes`}
+              </span>
+            </div>
+            <div className="h-2 bg-slate-200 rounded-full overflow-hidden mb-1">
+              <div className={`h-full rounded-full transition-all ${daysLeft !== null && daysLeft < 0 ? 'bg-red-500' : 'bg-indigo-500'}`}
+                style={{ width: `${timeProgress}%` }} />
+            </div>
+            <div className="flex justify-between text-xs text-slate-400">
+              <span>{project.planned_start_date}</span>
+              <span className="text-slate-500 font-medium">{timeProgress}% del tiempo</span>
+              <span>{project.planned_end_date}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Budget — only for managers */}
+        {isManager && plannedBudget > 0 && (
+          <div className="bg-slate-50 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                <TrendingUp size={13} className="text-emerald-500" /> Presupuesto
+              </h3>
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                budgetPct > 100 ? 'bg-red-100 text-red-700'
+                : budgetPct > 80 ? 'bg-amber-100 text-amber-700'
+                : 'bg-emerald-100 text-emerald-700'
+              }`}>
+                {budgetPct}% ejecutado
+              </span>
+            </div>
+            <div className="h-2 bg-slate-200 rounded-full overflow-hidden mb-1">
+              <div className={`h-full rounded-full transition-all ${budgetPct > 100 ? 'bg-red-500' : budgetPct > 80 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                style={{ width: `${Math.min(100, budgetPct)}%` }} />
+            </div>
+            <div className="flex justify-between text-xs text-slate-400">
+              <span>Planeado: <span className="font-medium text-slate-600">${Number(plannedBudget).toLocaleString()}</span></span>
+              <span>Ejecutado: <span className={`font-medium ${budgetPct > 100 ? 'text-red-600' : 'text-slate-600'}`}>${Number(executedBudget).toLocaleString()}</span></span>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Project info grid */}
       <div className="grid md:grid-cols-2 gap-6">

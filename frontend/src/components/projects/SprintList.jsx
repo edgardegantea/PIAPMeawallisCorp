@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { projectsAPI } from '../../services/projectsAPI';
 import { toast } from 'sonner';
-import { Plus, Trash2, BarChart2, X } from 'lucide-react';
+import { Plus, Trash2, BarChart2, X, Edit2, Check } from 'lucide-react';
 import ConfirmModal from '../ConfirmModal';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -16,14 +16,16 @@ const STATUS_COLORS = {
 
 const EMPTY = { project_id: '', name: '', goal: '', start_date: '', end_date: '', capacity: 0, status: 'PLANEADO', velocity_target: 0 };
 
-export default function SprintList({ projectId }) {
+export default function SprintList({ projectId, isManager = false }) {
   const [sprints, setSprints]       = useState([]);
   const [form, setForm]             = useState({ ...EMPTY, project_id: projectId });
   const [showForm, setShowForm]     = useState(false);
   const [loading, setLoading]       = useState(true);
-  const [burndownSprint, setBurndownSprint] = useState(null); // { sprint, burndown, total_hours }
+  const [burndownSprint, setBurndownSprint] = useState(null);
   const [loadingBd, setLoadingBd]   = useState(false);
   const [confirm, setConfirm]       = useState(null);
+  const [editId, setEditId]         = useState(null);
+  const [editForm, setEditForm]     = useState({});
 
   const load = () => {
     projectsAPI.getSprints(projectId).then((r) => setSprints(r.data)).finally(() => setLoading(false));
@@ -58,6 +60,20 @@ export default function SprintList({ projectId }) {
     } catch { toast.error('Error'); }
   };
 
+  const startEdit = (s) => {
+    setEditId(s.id);
+    setEditForm({ name: s.name, goal: s.goal || '', start_date: s.start_date, end_date: s.end_date, capacity: s.capacity || 0 });
+  };
+
+  const saveEdit = async () => {
+    try {
+      await projectsAPI.updateSprint(editId, editForm);
+      toast.success('Sprint actualizado');
+      setEditId(null);
+      load();
+    } catch { toast.error('Error al actualizar sprint'); }
+  };
+
   const showBurndown = async (sprintId) => {
     setLoadingBd(true);
     try {
@@ -73,10 +89,12 @@ export default function SprintList({ projectId }) {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-slate-700">Sprints ({sprints.length})</h3>
-        <button onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors">
-          <Plus size={14} /> Nuevo Sprint
-        </button>
+        {isManager && (
+          <button onClick={() => setShowForm(!showForm)}
+            className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors">
+            <Plus size={14} /> Nuevo Sprint
+          </button>
+        )}
       </div>
 
       {showForm && (
@@ -165,36 +183,82 @@ export default function SprintList({ projectId }) {
         <div className="space-y-3">
           {sprints.map((s) => (
             <div key={s.id} className="border border-slate-200 rounded-xl p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-slate-700">Sprint {s.number}: {s.name}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[s.status]}`}>{s.status}</span>
+              {editId === s.id ? (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="col-span-2">
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Nombre</label>
+                      <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                        className="w-full border border-slate-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Inicio</label>
+                      <input type="date" value={editForm.start_date} onChange={(e) => setEditForm({ ...editForm, start_date: e.target.value })}
+                        className="w-full border border-slate-300 rounded px-3 py-1.5 text-sm focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Fin</label>
+                      <input type="date" value={editForm.end_date} onChange={(e) => setEditForm({ ...editForm, end_date: e.target.value })}
+                        className="w-full border border-slate-300 rounded px-3 py-1.5 text-sm focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Capacidad (h)</label>
+                      <input type="number" min="0" value={editForm.capacity} onChange={(e) => setEditForm({ ...editForm, capacity: e.target.value })}
+                        className="w-full border border-slate-300 rounded px-3 py-1.5 text-sm focus:outline-none" />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Objetivo</label>
+                      <textarea rows={2} value={editForm.goal} onChange={(e) => setEditForm({ ...editForm, goal: e.target.value })}
+                        className="w-full border border-slate-300 rounded px-3 py-1.5 text-sm focus:outline-none resize-none" />
+                    </div>
                   </div>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    {s.start_date} → {s.end_date}
-                    {s.capacity > 0 && <span className="ml-2 text-slate-400">· {s.capacity}h cap.</span>}
-                  </p>
+                  <div className="flex justify-end gap-2">
+                    <button onClick={() => setEditId(null)} className="text-slate-400 hover:text-slate-600 p-1"><X size={14} /></button>
+                    <button onClick={saveEdit} className="bg-indigo-600 text-white text-xs px-3 py-1 rounded-lg flex items-center gap-1">
+                      <Check size={12} /> Guardar
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => showBurndown(s.id)} disabled={loadingBd}
-                    title="Ver burndown"
-                    className="text-slate-400 hover:text-indigo-600 transition-colors p-1 rounded">
-                    <BarChart2 size={16} />
-                  </button>
-                  <select value={s.status}
-                    onChange={(e) => changeStatus(s.id, e.target.value)}
-                    className="text-xs border border-slate-200 rounded px-2 py-1 focus:outline-none">
-                    <option value="PLANEADO">Planeado</option>
-                    <option value="ACTIVO">Activo</option>
-                    <option value="CERRADO">Cerrado</option>
-                  </select>
-                  <button onClick={() => remove(s.id)} className="text-red-400 hover:text-red-600">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-              {s.goal && <p className="text-xs text-slate-500 mt-2">{s.goal}</p>}
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-slate-700">Sprint {s.number}: {s.name}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[s.status]}`}>{s.status}</span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {s.start_date} → {s.end_date}
+                        {s.capacity > 0 && <span className="ml-2">· {s.capacity}h cap.</span>}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => showBurndown(s.id)} disabled={loadingBd}
+                        title="Ver burndown" className="text-slate-400 hover:text-indigo-600 transition-colors p-1 rounded">
+                        <BarChart2 size={16} />
+                      </button>
+                      {isManager && (
+                        <button onClick={() => startEdit(s)} title="Editar sprint"
+                          className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded hover:bg-slate-100">
+                          <Edit2 size={14} />
+                        </button>
+                      )}
+                      <select value={s.status} onChange={(e) => changeStatus(s.id, e.target.value)}
+                        className="text-xs border border-slate-200 rounded px-2 py-1 focus:outline-none">
+                        <option value="PLANEADO">Planeado</option>
+                        <option value="ACTIVO">Activo</option>
+                        <option value="CERRADO">Cerrado</option>
+                      </select>
+                      {isManager && (
+                        <button onClick={() => remove(s.id)} className="text-red-400 hover:text-red-600 p-1">
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {s.goal && <p className="text-xs text-slate-500 mt-2">{s.goal}</p>}
+                </>
+              )}
             </div>
           ))}
         </div>

@@ -22,7 +22,7 @@ const EMPTY = {
   start_date: '', end_date: '', signed_date: '', description: '', file_url: '', notes: '',
 };
 
-export default function ContractList({ projectId }) {
+export default function ContractList({ projectId, isManager = false }) {
   const [contracts, setContracts] = useState([]);
   const [form, setForm]           = useState({ ...EMPTY });
   const [showForm, setShowForm]   = useState(false);
@@ -92,10 +92,12 @@ export default function ContractList({ projectId }) {
             <p className="text-xs text-emerald-600 font-medium mt-0.5">{activeCount} contrato{activeCount !== 1 ? 's' : ''} activo{activeCount !== 1 ? 's' : ''}</p>
           )}
         </div>
-        <button onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors">
-          <Plus size={14} /> Nuevo Contrato
-        </button>
+        {isManager && (
+          <button onClick={() => setShowForm(!showForm)}
+            className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors">
+            <Plus size={14} /> Nuevo Contrato
+          </button>
+        )}
       </div>
 
       {/* Create form */}
@@ -214,14 +216,18 @@ export default function ContractList({ projectId }) {
                         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[c.status]}`}>
                           {c.status}
                         </span>
-                        <button onClick={() => startEdit(c)}
-                          className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors">
-                          <Edit2 size={13} />
-                        </button>
-                        <button onClick={() => remove(c.id)}
-                          className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors">
-                          <Trash2 size={13} />
-                        </button>
+                        {isManager && (
+                          <>
+                            <button onClick={() => startEdit(c)}
+                              className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors">
+                              <Edit2 size={13} />
+                            </button>
+                            <button onClick={() => remove(c.id)}
+                              className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors">
+                              <Trash2 size={13} />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
 

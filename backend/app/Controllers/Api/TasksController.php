@@ -82,6 +82,56 @@ class TasksController extends BaseController
         return $this->response->setJSON($task);
     }
 
+    /**
+     * GET /api/tasks/my — tareas asignadas al usuario autenticado (todos los proyectos).
+     * Acepta ?status=PENDIENTE|EN_PROGRESO|BLOQUEADA|COMPLETADA (opcional).
+     */
+    public function myTasks(): ResponseInterface
+    {
+        $userId = Auth::id();
+        $db     = Database::connect();
+        $status = $this->request->getGet('status');
+
+        $sql    = "
+            SELECT t.*,
+                   s.name     AS sprint_name,
+                   s.number   AS sprint_number,
+                   p.id       AS project_id,
+                   p.name     AS project_name,
+                   p.code     AS project_code,
+                   u.first_name AS assignee_first_name,
+                   u.last_name  AS assignee_last_name
+            FROM   tasks t
+            JOIN   sprints  s ON s.id  = t.sprint_id
+            JOIN   projects p ON p.id  = s.project_id
+            LEFT JOIN users u ON u.id  = t.assigned_to
+            WHERE  t.assigned_to = ?
+              AND  p.is_active   = 1
+        ";
+        $params = [$userId];
+
+        if ($status) {
+            $sql   .= ' AND t.status = ?';
+            $params[] = $status;
+        } else {
+            $sql   .= " AND t.status != 'COMPLETADA'";
+        }
+
+        $sql .= "
+            ORDER BY
+              CASE t.priority
+                WHEN 'CRITICA' THEN 1
+                WHEN 'ALTA'    THEN 2
+                WHEN 'MEDIA'   THEN 3
+                ELSE 4 END,
+              t.due_date ASC,
+              t.id       ASC
+        ";
+
+        $tasks = $db->query($sql, $params)->getResultArray();
+        return $this->response->setJSON($tasks);
+    }
+
     public function create(): ResponseInterface
     {
         $data  = $this->request->getJSON(true) ?? $this->request->getPost();

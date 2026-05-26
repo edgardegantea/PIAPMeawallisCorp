@@ -20,6 +20,7 @@ import NotFoundPage       from './pages/NotFoundPage';
 import ProjectsListPage  from './pages/projects/ProjectsListPage';
 import ProjectDetailPage from './pages/projects/ProjectDetailPage';
 import ProjectFormPage   from './pages/projects/ProjectFormPage';
+import MyTasksPage       from './pages/MyTasksPage';
 
 function PrivateRoute({ children }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -54,6 +55,7 @@ export default function App() {
         <Route path="/users"            element={<PrivateRoute><UsersPage /></PrivateRoute>} />
         <Route path="/permissions"      element={<PrivateRoute><PermissionsPage /></PrivateRoute>} />
 
+        <Route path="/my-tasks"          element={<PrivateRoute><MyTasksPage /></PrivateRoute>} />
         <Route path="/projects"          element={<PrivateRoute><ProjectsListPage /></PrivateRoute>} />
         <Route path="/projects/new"      element={<PrivateRoute><ProjectFormPage /></PrivateRoute>} />
         <Route path="/projects/:id"      element={<PrivateRoute><ProjectDetailPage /></PrivateRoute>} />

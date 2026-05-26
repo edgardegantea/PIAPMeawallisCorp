@@ -29,7 +29,7 @@ const EMPTY = {
   status: 'BORRADOR', description: '', file_url: '', tags: '',
 };
 
-export default function TechnicalDocList({ projectId }) {
+export default function TechnicalDocList({ projectId, isManager = false }) {
   const [docs, setDocs]         = useState([]);
   const [form, setForm]         = useState({ ...EMPTY });
   const [showForm, setShowForm] = useState(false);
@@ -105,10 +105,12 @@ export default function TechnicalDocList({ projectId }) {
             <p className="text-xs text-emerald-600 font-medium mt-0.5">{approvedCount} aprobado{approvedCount !== 1 ? 's' : ''}</p>
           )}
         </div>
-        <button onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors">
-          <Plus size={14} /> Nuevo Documento
-        </button>
+        {isManager && (
+          <button onClick={() => setShowForm(!showForm)}
+            className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors">
+            <Plus size={14} /> Nuevo Documento
+          </button>
+        )}
       </div>
 
       {/* Type filter chips */}
@@ -218,16 +220,18 @@ export default function TechnicalDocList({ projectId }) {
                           </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button onClick={() => startEdit(d)}
-                          className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors">
-                          <Edit2 size={13} />
-                        </button>
-                        <button onClick={() => remove(d.id)}
-                          className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors">
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
+                      {isManager && (
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <button onClick={() => startEdit(d)}
+                            className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors">
+                            <Edit2 size={13} />
+                          </button>
+                          <button onClick={() => remove(d.id)}
+                            className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors">
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {d.description && (

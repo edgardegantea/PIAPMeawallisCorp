@@ -7,7 +7,7 @@ import { downloadCSV } from '../../utils/csv';
 
 const EMPTY = { project_id: '', title: '', description: '', due_date: '' };
 
-export default function MilestoneList({ projectId }) {
+export default function MilestoneList({ projectId, isManager = false }) {
   const [milestones, setMilestones] = useState([]);
   const [form, setForm]             = useState({ ...EMPTY, project_id: projectId });
   const [showForm, setShowForm]     = useState(false);
@@ -92,10 +92,12 @@ export default function MilestoneList({ projectId }) {
               <Download size={14} /> CSV
             </button>
           )}
-          <button onClick={() => setShowForm(!showForm)}
-            className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors">
-            <Plus size={14} /> Nuevo Hito
-          </button>
+          {isManager && (
+            <button onClick={() => setShowForm(!showForm)}
+              className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors">
+              <Plus size={14} /> Nuevo Hito
+            </button>
+          )}
         </div>
       </div>
 
@@ -196,20 +198,26 @@ export default function MilestoneList({ projectId }) {
                           </p>
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
-                          <button onClick={() => toggle(m.id)}
-                            title={isDone ? 'Marcar como pendiente' : 'Marcar como completado'}
-                            className={`p-1.5 rounded-lg text-xs font-medium transition-colors
-                              ${isDone ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-slate-100 text-slate-600 hover:bg-emerald-100 hover:text-emerald-700'}`}>
-                            <CheckCircle2 size={14} />
-                          </button>
-                          <button onClick={() => startEdit(m)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
-                            <Edit2 size={14} />
-                          </button>
-                          <button onClick={() => remove(m.id)}
-                            className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors">
-                            <Trash2 size={14} />
-                          </button>
+                          {isManager && (
+                            <button onClick={() => toggle(m.id)}
+                              title={isDone ? 'Marcar como pendiente' : 'Marcar como completado'}
+                              className={`p-1.5 rounded-lg text-xs font-medium transition-colors
+                                ${isDone ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-slate-100 text-slate-600 hover:bg-emerald-100 hover:text-emerald-700'}`}>
+                              <CheckCircle2 size={14} />
+                            </button>
+                          )}
+                          {isManager && (
+                            <button onClick={() => startEdit(m)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+                              <Edit2 size={14} />
+                            </button>
+                          )}
+                          {isManager && (
+                            <button onClick={() => remove(m.id)}
+                              className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors">
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                         </div>
                       </div>
                     )}

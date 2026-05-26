@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { projectsAPI } from '../../services/projectsAPI';
+import { useAuthStore } from '../../stores/authStore';
 import { toast } from 'sonner';
-import { Plus, Trash2, Flag, Calendar, Clock, GripVertical, Download } from 'lucide-react';
+import { Plus, Trash2, Flag, Calendar, Clock, GripVertical, Download, User } from 'lucide-react';
 import { downloadCSV } from '../../utils/csv';
 import TaskDetailModal from './TaskDetailModal';
 
@@ -22,6 +23,7 @@ const PRIORITY_STYLES = {
 const PRIORITIES = ['', 'BAJA', 'MEDIA', 'ALTA', 'CRITICA'];
 
 export default function KanbanBoard({ projectId, isManager = true }) {
+  const { user }                        = useAuthStore();
   const [sprints, setSprints]           = useState([]);
   const [tasks, setTasks]               = useState([]);
   const [sprintId, setSprintId]         = useState('');
@@ -29,6 +31,7 @@ export default function KanbanBoard({ projectId, isManager = true }) {
   const [newTask, setNewTask]           = useState({ column: '', title: '' });
   const [showNew, setShowNew]           = useState(null);
   const [priorityFilter, setPriority]   = useState('');
+  const [onlyMine, setOnlyMine]         = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
 
   // ── Drag & drop state ──────────────────────────────────────
@@ -52,9 +55,9 @@ export default function KanbanBoard({ projectId, isManager = true }) {
 
   useEffect(() => { loadTasks(sprintId); }, [sprintId]);
 
-  const filteredTasks = priorityFilter
-    ? tasks.filter((t) => t.priority === priorityFilter)
-    : tasks;
+  const filteredTasks = tasks
+    .filter((t) => !priorityFilter  || t.priority === priorityFilter)
+    .filter((t) => !onlyMine        || String(t.assigned_to) === String(user?.id));
 
   const addTask = async (status) => {
     const title = newTask.title.trim();
@@ -168,6 +171,15 @@ export default function KanbanBoard({ projectId, isManager = true }) {
             ))}
           </select>
         </div>
+        <button
+          onClick={() => setOnlyMine((v) => !v)}
+          title={onlyMine ? 'Ver todas las tareas' : 'Ver solo mis tareas'}
+          className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border transition-colors
+            ${onlyMine
+              ? 'bg-indigo-600 text-white border-indigo-600'
+              : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}>
+          <User size={13} /> {onlyMine ? 'Mis tareas' : 'Todas'}
+        </button>
         <div className="ml-auto flex items-center gap-3">
           {filteredTasks.length > 0 && (
             <button onClick={() => downloadCSV(filteredTasks, [

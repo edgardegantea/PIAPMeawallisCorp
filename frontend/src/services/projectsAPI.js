@@ -34,6 +34,7 @@ export const projectsAPI = {
 
   // Tareas (Kanban)
   getTasks:    (params) => api.get('/tasks', { params }),
+  getMyTasks:  (params) => api.get('/tasks/my', { params }),
   createTask:  (d)      => api.post('/tasks', d),
   updateTask:  (id, d)  => api.patch(`/tasks/${id}`, d),
   deleteTask:  (id)     => api.delete(`/tasks/${id}`),

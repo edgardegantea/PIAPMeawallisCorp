@@ -35,7 +35,7 @@ function riskLevel(prob, impact) {
 
 const EMPTY = { project_id: '', description: '', probability: 'MEDIA', impact: 'MEDIO', mitigation_plan: '', status: 'ACTIVO' };
 
-export default function RiskList({ projectId }) {
+export default function RiskList({ projectId, isManager = false }) {
   const [risks, setRisks]       = useState([]);
   const [form, setForm]         = useState({ ...EMPTY, project_id: projectId });
   const [showForm, setShowForm] = useState(false);
@@ -109,10 +109,12 @@ export default function RiskList({ projectId }) {
               <Download size={14} /> CSV
             </button>
           )}
-          <button onClick={() => setShowForm(!showForm)}
-            className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-3 py-2 rounded-lg">
-            <Plus size={14} /> Nuevo Riesgo
-          </button>
+          {isManager && (
+            <button onClick={() => setShowForm(!showForm)}
+              className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-3 py-2 rounded-lg">
+              <Plus size={14} /> Nuevo Riesgo
+            </button>
+          )}
         </div>
       </div>
 
@@ -208,14 +210,18 @@ export default function RiskList({ projectId }) {
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${level.cls}`}>
                           {level.label}
                         </span>
-                        <button onClick={() => startEdit(r)}
-                          className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors">
-                          <Edit2 size={13} />
-                        </button>
-                        <button onClick={() => remove(r.id)}
-                          className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors">
-                          <Trash2 size={13} />
-                        </button>
+                        {isManager && (
+                          <>
+                            <button onClick={() => startEdit(r)}
+                              className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors">
+                              <Edit2 size={13} />
+                            </button>
+                            <button onClick={() => remove(r.id)}
+                              className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors">
+                              <Trash2 size={13} />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
 

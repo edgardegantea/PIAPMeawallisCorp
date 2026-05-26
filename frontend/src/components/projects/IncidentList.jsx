@@ -20,7 +20,7 @@ const STATUS_COLORS = {
 
 const EMPTY = { project_id: '', title: '', description: '', severity: 'MEDIA', status: 'ABIERTA', assigned_to: '' };
 
-export default function IncidentList({ projectId }) {
+export default function IncidentList({ projectId, isManager = false }) {
   const [incidents, setIncidents] = useState([]);
   const [members, setMembers]     = useState([]);
   const [form, setForm]           = useState({ ...EMPTY, project_id: projectId });
@@ -99,10 +99,12 @@ export default function IncidentList({ projectId }) {
               <Download size={14} /> CSV
             </button>
           )}
-          <button onClick={() => setShowForm(!showForm)}
-            className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-3 py-2 rounded-lg">
-            <Plus size={14} /> Nueva Incidencia
-          </button>
+          {isManager && (
+            <button onClick={() => setShowForm(!showForm)}
+              className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-3 py-2 rounded-lg">
+              <Plus size={14} /> Nueva Incidencia
+            </button>
+          )}
         </div>
       </div>
 
@@ -223,14 +225,18 @@ export default function IncidentList({ projectId }) {
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${SEV_COLORS[inc.severity]}`}>
                         {inc.severity}
                       </span>
-                      <button onClick={() => startEdit(inc)}
-                        className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors">
-                        <Edit2 size={13} />
-                      </button>
-                      <button onClick={() => remove(inc.id)}
-                        className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors">
-                        <Trash2 size={13} />
-                      </button>
+                      {isManager && (
+                        <button onClick={() => startEdit(inc)}
+                          className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors">
+                          <Edit2 size={13} />
+                        </button>
+                      )}
+                      {isManager && (
+                        <button onClick={() => remove(inc.id)}
+                          className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors">
+                          <Trash2 size={13} />
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-3 mt-2">

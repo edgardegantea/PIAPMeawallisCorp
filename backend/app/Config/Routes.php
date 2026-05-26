@@ -80,6 +80,7 @@ $routes->group('api', ['filter' => 'auth'], function ($routes) {
 
     // Tasks
     $routes->get('tasks',                                 'Api\TasksController::index');
+    $routes->get('tasks/my',                              'Api\TasksController::myTasks');
     $routes->post('tasks',                                'Api\TasksController::create');
     $routes->get('tasks/(:num)',                          'Api\TasksController::show/$1');
     $routes->put('tasks/(:num)',                          'Api\TasksController::update/$1');
