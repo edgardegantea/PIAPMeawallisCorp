@@ -230,8 +230,15 @@ class AuthController extends BaseController
             return $this->response->setJSON(['message' => 'Si el correo existe, recibirás un enlace en breve.']);
         }
 
-        $resetModel  = new PasswordResetModel();
-        $token       = $resetModel->generate($email);
+        try {
+            $resetModel  = new PasswordResetModel();
+            $token       = $resetModel->generate($email);
+        } catch (\Throwable $e) {
+            log_message('error', '[ForgotPassword] Error generando token: ' . $e->getMessage());
+            return $this->response->setStatusCode(500)
+                ->setJSON(['message' => 'Error interno. Intenta más tarde.']);
+        }
+
         $frontendUrl = rtrim((string)(env('APP_FRONTEND_URL') ?? 'https://piap.maewalliscorp.org'), '/');
         $resetLink   = "{$frontendUrl}/reset-password?token={$token}";
 
