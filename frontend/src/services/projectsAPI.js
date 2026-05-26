@@ -83,7 +83,8 @@ export const projectsAPI = {
   adminCreateUser:   (d)     => api.post('/admin/users', d),
   adminUpdateUser:   (id, d) => api.patch(`/admin/users/${id}`, d),
   adminDeleteUser:   (id)    => api.delete(`/admin/users/${id}`),
-  adminActivateUser: (id)    => api.post(`/admin/users/${id}/activate`),
+  adminActivateUser:     (id)    => api.post(`/admin/users/${id}/activate`),
+  adminResetUserPassword:(id)    => api.post(`/admin/users/${id}/reset-password`),
   adminGetTeams:     ()      => api.get('/admin/teams'),
 
   // Task Checklists
@@ -148,8 +149,9 @@ export const projectsAPI = {
   getNotifications: () => api.get('/notifications'),
 
   // Reportes
-  getReportOverview:   ()   => api.get('/reports/overview'),
-  getReportProject:    (id) => api.get(`/reports/project/${id}`),
+  getReportOverview:   ()       => api.get('/reports/overview'),
+  getReportRange:      (params) => api.get('/reports/range', { params }),
+  getReportProject:    (id)     => api.get(`/reports/project/${id}`),
 
   // Épicas
   getEpics:    (projectId) => api.get('/epics', { params: { project: projectId } }),

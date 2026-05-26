@@ -178,4 +178,33 @@ class UsersController extends BaseController
         $this->model->update($id, ['is_active' => 1]);
         return $this->response->setJSON($this->model->safeFind($id));
     }
+
+    /** POST /api/admin/users/{id}/reset-password — admin envía enlace de recuperación */
+    public function sendResetEmail(int $id): ResponseInterface
+    {
+        $user = $this->model->find($id);
+        if (!$user) {
+            return $this->response->setStatusCode(404)->setJSON(['message' => 'Usuario no encontrado']);
+        }
+        if (empty($user['email'])) {
+            return $this->response->setStatusCode(422)->setJSON(['message' => 'El usuario no tiene email registrado']);
+        }
+
+        try {
+            $resetModel = new \App\Models\PasswordResetModel();
+            $token      = $resetModel->generate($user['email']);
+        } catch (\Throwable $e) {
+            log_message('error', '[AdminResetEmail] Error: ' . $e->getMessage());
+            return $this->response->setStatusCode(500)->setJSON(['message' => 'Error al generar el enlace']);
+        }
+
+        $frontendUrl = rtrim((string)(env('APP_FRONTEND_URL') ?? 'https://piap.maewalliscorp.org'), '/');
+        $resetLink   = "{$frontendUrl}/reset-password?token={$token}";
+
+        if (!\App\Libraries\MailService::sendPasswordReset($user, $resetLink)) {
+            return $this->response->setStatusCode(500)->setJSON(['message' => 'Error al enviar el correo']);
+        }
+
+        return $this->response->setJSON(['message' => "Enlace enviado a {$user['email']}"]);
+    }
 }

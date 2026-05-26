@@ -140,7 +140,8 @@ $routes->group('api', ['filter' => 'auth'], function ($routes) {
 
     // Reportes
     $routes->get('reports/overview',        'Api\ReportsController::overview');
-    $routes->get('reports/project/(:num)',   'Api\ReportsController::project/$1');
+    $routes->get('reports/range',           'Api\ReportsController::range');
+    $routes->get('reports/project/(:num)',  'Api\ReportsController::project/$1');
 
     // Company Settings
     $routes->get('company-settings',    'Api\CompanySettingsController::show');
@@ -220,11 +221,12 @@ $routes->group('api', ['filter' => 'auth'], function ($routes) {
 // Rutas ADMIN (auth + admin filter)
 $routes->group('api/admin', ['filter' => ['auth', 'admin']], function ($routes) {
     // User management
-    $routes->post('users',                   'Api\UsersController::create');
-    $routes->patch('users/(:num)',            'Api\UsersController::update/$1');
-    $routes->put('users/(:num)',              'Api\UsersController::update/$1');
-    $routes->delete('users/(:num)',           'Api\UsersController::delete/$1');
-    $routes->post('users/(:num)/activate',   'Api\UsersController::activate/$1');
+    $routes->post('users',                          'Api\UsersController::create');
+    $routes->patch('users/(:num)',                  'Api\UsersController::update/$1');
+    $routes->put('users/(:num)',                    'Api\UsersController::update/$1');
+    $routes->delete('users/(:num)',                 'Api\UsersController::delete/$1');
+    $routes->post('users/(:num)/activate',          'Api\UsersController::activate/$1');
+    $routes->post('users/(:num)/reset-password',    'Api\UsersController::sendResetEmail/$1');
     // Permissions panel
-    $routes->get('teams',                    'Api\MembersController::allTeams');
+    $routes->get('teams',                           'Api\MembersController::allTeams');
 });

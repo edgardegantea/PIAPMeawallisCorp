@@ -225,4 +225,120 @@ class ReportsController extends BaseController
             'backlog'    => $backlog,
         ]);
     }
+
+    /**
+     * GET /api/reports/range?from=YYYY-MM-DD&to=YYYY-MM-DD
+     * Métricas de actividad para un período específico.
+     */
+    public function range(): ResponseInterface
+    {
+        $from = $this->request->getGet('from') ?: date('Y-m-01');
+        $to   = $this->request->getGet('to')   ?: date('Y-m-d');
+
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) {
+            return $this->response->setStatusCode(422)->setJSON(['message' => 'Formato inválido (YYYY-MM-DD)']);
+        }
+
+        $db = Database::connect();
+
+        // Tareas creadas en el período
+        $tasksCreated = $db->query("
+            SELECT COUNT(*) as total,
+                   SUM(CASE WHEN status = 'COMPLETADA' THEN 1 ELSE 0 END) as completadas,
+                   SUM(CASE WHEN priority = 'CRITICA' THEN 1 ELSE 0 END) as criticas,
+                   COALESCE(SUM(estimated_hours), 0) as horas_estimadas
+            FROM tasks
+            WHERE DATE(created_at) BETWEEN ? AND ?
+        ", [$from, $to])->getRowArray();
+
+        // Tareas marcadas como completadas en el período
+        $tasksCompleted = $db->query("
+            SELECT COUNT(*) as total,
+                   COALESCE(SUM(estimated_hours), 0) as horas_estimadas,
+                   COALESCE(SUM(time_logged), 0) as horas_registradas
+            FROM tasks
+            WHERE status = 'COMPLETADA' AND DATE(updated_at) BETWEEN ? AND ?
+        ", [$from, $to])->getRowArray();
+
+        // Horas registradas en el período (task_time_logs)
+        $hours = $db->query("
+            SELECT COALESCE(SUM(hours), 0) as total_horas,
+                   COUNT(DISTINCT user_id) as usuarios_activos,
+                   COUNT(*) as registros
+            FROM task_time_logs
+            WHERE DATE(work_date) BETWEEN ? AND ?
+        ", [$from, $to])->getRowArray();
+
+        // Horas por usuario en el período
+        $hoursByUser = $db->query("
+            SELECT u.first_name, u.last_name, u.username, u.role, u.department,
+                   COALESCE(SUM(tl.hours), 0) as horas,
+                   COUNT(DISTINCT tl.task_id) as tareas
+            FROM task_time_logs tl
+            JOIN users u ON u.id = tl.user_id
+            WHERE DATE(tl.work_date) BETWEEN ? AND ?
+            GROUP BY u.id
+            ORDER BY horas DESC
+            LIMIT 10
+        ", [$from, $to])->getResultArray();
+
+        // Proyectos creados en el período
+        $projectsCreated = $db->query("
+            SELECT COUNT(*) as total,
+                   COALESCE(SUM(planned_budget), 0) as presupuesto
+            FROM projects
+            WHERE DATE(created_at) BETWEEN ? AND ?
+        ", [$from, $to])->getRowArray();
+
+        // Riesgos registrados en el período
+        $risksCreated = $db->query("
+            SELECT COUNT(*) as total,
+                   SUM(CASE WHEN probability = 'ALTA' AND impact = 'ALTO' THEN 1 ELSE 0 END) as criticos
+            FROM risks
+            WHERE DATE(created_at) BETWEEN ? AND ?
+        ", [$from, $to])->getRowArray();
+
+        // Incidencias en el período
+        $incidentsCreated = $db->query("
+            SELECT COUNT(*) as total,
+                   SUM(CASE WHEN severity = 'CRITICA' THEN 1 ELSE 0 END) as criticas,
+                   SUM(CASE WHEN status = 'RESUELTA' THEN 1 ELSE 0 END) as resueltas
+            FROM incidents
+            WHERE DATE(created_at) BETWEEN ? AND ?
+        ", [$from, $to])->getRowArray();
+
+        // Tareas completadas por proyecto en el período
+        $tasksByProject = $db->query("
+            SELECT p.name as project, p.code,
+                   COUNT(t.id) as completadas,
+                   COALESCE(SUM(t.time_logged), 0) as horas
+            FROM tasks t
+            JOIN sprints s ON s.id = t.sprint_id
+            JOIN projects p ON p.id = s.project_id
+            WHERE t.status = 'COMPLETADA' AND DATE(t.updated_at) BETWEEN ? AND ?
+            GROUP BY p.id
+            ORDER BY completadas DESC
+            LIMIT 8
+        ", [$from, $to])->getResultArray();
+
+        // Nuevos miembros incorporados en el período
+        $membersAdded = $db->query("
+            SELECT COUNT(*) as total
+            FROM project_members
+            WHERE DATE(assigned_at) BETWEEN ? AND ?
+        ", [$from, $to])->getRowArray();
+
+        return $this->response->setJSON([
+            'period'            => ['from' => $from, 'to' => $to],
+            'tasks_created'     => $tasksCreated,
+            'tasks_completed'   => $tasksCompleted,
+            'hours'             => $hours,
+            'hours_by_user'     => $hoursByUser,
+            'projects_created'  => $projectsCreated,
+            'risks_created'     => $risksCreated,
+            'incidents_created' => $incidentsCreated,
+            'tasks_by_project'  => $tasksByProject,
+            'members_added'     => $membersAdded,
+        ]);
+    }
 }
