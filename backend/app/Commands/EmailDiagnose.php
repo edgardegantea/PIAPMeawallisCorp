@@ -117,24 +117,39 @@ class EmailDiagnose extends BaseCommand
         }
         CLI::write('   PHP ' . PHP_VERSION);
 
-        // ── 6. Envío real (opcional con --send) ───────────────────────────────
+        // ── 6. Verificar si el email existe en la BD ──────────────────────────
         $sendTo = CLI::getOption('send') ?? $params[0] ?? null;
         if ($sendTo) {
             CLI::write('');
-            CLI::write("6. Envío de prueba a {$sendTo}", 'yellow');
+            CLI::write("6. Usuario en base de datos: {$sendTo}", 'yellow');
+            try {
+                $db   = Database::connect();
+                $user = $db->table('users')->where('email', $sendTo)->where('is_active', 1)->get()->getRowArray();
+                if ($user) {
+                    CLI::write("   ✅ Encontrado: {$user['first_name']} {$user['last_name']} (rol: {$user['role']})", 'green');
+                } else {
+                    CLI::write("   ❌ Email NO registrado en la base de datos de produccion", 'red');
+                    CLI::write("   → El endpoint retorna 200 pero NO envia email (comportamiento de seguridad)", 'light_gray');
+                    CLI::write("   → Registra este usuario en el sistema primero", 'light_gray');
+                    $allOk = false;
+                }
+            } catch (\Throwable $e) {
+                CLI::write("   ❌ Error al consultar DB: " . $e->getMessage(), 'red');
+                $allOk = false;
+            }
 
-            $mailer = \Config\Services::email(null, false);
-            $mailer->setFrom($cfg->fromEmail, $cfg->fromName);
-            $mailer->setTo($sendTo);
-            $mailer->setSubject('Diagnóstico PIAP - ' . date('d/m/Y H:i:s'));
-            $mailer->setMessage('<p>Correo de diagnóstico enviado desde el servidor.</p><p>' . date('c') . '</p>');
-
-            if ($mailer->send(false)) {
+            // ── 7. Envío real de email (solo si usuario existe) ───────────────
+            CLI::write('');
+            CLI::write("7. Envio de prueba a {$sendTo}", 'yellow');
+            $ok = \App\Libraries\MailService::send(
+                $sendTo,
+                'Diagnostico PIAP - ' . date('d/m/Y H:i:s'),
+                '<p>Correo de diagnostico enviado desde el servidor.</p><p>' . date('c') . '</p>'
+            );
+            if ($ok) {
                 CLI::write('   ✅ Correo enviado exitosamente', 'green');
             } else {
-                $debug = strip_tags($mailer->printDebugger(['headers', 'subject']));
-                CLI::write('   ❌ Falló el envío:', 'red');
-                CLI::write($debug);
+                CLI::write('   ❌ Fallo el envio — revisa writable/logs/log-' . date('Y-m-d') . '.log', 'red');
                 $allOk = false;
             }
         }
