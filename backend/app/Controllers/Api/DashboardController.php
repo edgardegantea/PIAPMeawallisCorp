@@ -82,7 +82,7 @@ class DashboardController extends BaseController
             SELECT COALESCE(SUM(tl.hours), 0) AS total
             FROM task_time_logs tl
             WHERE tl.user_id = ?
-              AND tl.logged_at >= ?
+              AND tl.work_date >= ?
         ", [$userId, $weekStart])->getRow()->total ?? 0);
 
         // Tareas completadas esta semana
@@ -145,7 +145,7 @@ class DashboardController extends BaseController
             FROM activity_logs al
             JOIN projects p ON p.id = al.project_id
             LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ?
-            JOIN users u ON u.id = al.user_id
+            LEFT JOIN users u ON u.id = al.user_id
             WHERE (p.director_id = ? OR pm.user_id = ?)
             GROUP BY al.id
             ORDER BY al.created_at DESC
