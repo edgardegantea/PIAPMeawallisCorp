@@ -62,14 +62,14 @@ export default function UsersPage() {
 
   // Filter by status on client (backend returns all for admin/director/pm)
   const filtered = useMemo(() => {
-    if (statusFilter === 'active')   return users.filter((u) => u.is_active);
-    if (statusFilter === 'inactive') return users.filter((u) => !u.is_active);
+    if (statusFilter === 'active')   return users.filter((u) => Number(u.is_active) === 1);
+    if (statusFilter === 'inactive') return users.filter((u) => Number(u.is_active) !== 1);
     return users;
   }, [users, statusFilter]);
 
   // Role stats
   const stats = useMemo(() => {
-    const active   = users.filter((u) => u.is_active).length;
+    const active   = users.filter((u) => Number(u.is_active) === 1).length;
     const inactive = users.length - active;
     const byRole   = ROLES.map((r) => ({ role: r, count: users.filter((u) => u.role === r).length }));
     return { total: users.length, active, inactive, byRole };
@@ -108,9 +108,12 @@ export default function UsersPage() {
     } finally { setSaving(false); }
   };
 
+  // MySQLi devuelve TINYINT como string "0"/"1"; Number() normaliza ambos
+  const isActive = (u) => Number(u.is_active) === 1;
+
   const toggleActive = async (u) => {
     try {
-      if (u.is_active) {
+      if (isActive(u)) {
         await projectsAPI.adminDeleteUser(u.id);
         toast.success('Usuario desactivado');
       } else {
@@ -214,7 +217,7 @@ export default function UsersPage() {
                 {filtered.length === 0 ? (
                   <tr><td colSpan={6} className="text-center py-12 text-slate-400">Sin resultados</td></tr>
                 ) : filtered.map((u) => (
-                  <tr key={u.id} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${!u.is_active ? 'opacity-50' : ''}`}>
+                  <tr key={u.id} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${!isActive(u) ? 'opacity-50' : ''}`}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-xs font-semibold text-indigo-700 dark:text-indigo-300 flex-shrink-0">
@@ -241,30 +244,31 @@ export default function UsersPage() {
                       {isAdmin && u.id !== me?.id ? (
                         <button
                           onClick={() => setConfirm({
-                            title:        u.is_active ? 'Desactivar usuario' : 'Activar usuario',
-                            body:         u.is_active
+                            title:        isActive(u) ? 'Desactivar usuario' : 'Activar usuario',
+                            body:         isActive(u)
                               ? `${u.first_name || u.username} quedará bloqueado y no podrá iniciar sesión.`
                               : `${u.first_name || u.username} podrá volver a iniciar sesión.`,
-                            variant:      u.is_active ? 'danger' : 'success',
-                            confirmLabel: u.is_active ? 'Desactivar' : 'Activar',
+                            variant:      isActive(u) ? 'danger' : 'success',
+                            confirmLabel: isActive(u) ? 'Desactivar' : 'Activar',
                             onConfirm:    () => toggleActive(u),
                           })}
                           className="group flex items-center gap-2 cursor-pointer select-none"
-                          title={u.is_active ? 'Clic para desactivar' : 'Clic para activar'}>
-                          {/* Toggle pill */}
+                          title={isActive(u) ? 'Clic para desactivar' : 'Clic para activar'}>
+                          {/* Toggle pill: h-5 w-9 (20×36px), thumb h-3.5 w-3.5 (14px)
+                              inactivo: translate-x-0.5 (2px) | activo: translate-x-5 (20px = 36-14-2) */}
                           <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200
-                            ${u.is_active ? 'bg-emerald-500 group-hover:bg-emerald-600' : 'bg-slate-300 dark:bg-slate-600 group-hover:bg-slate-400'}`}>
+                            ${isActive(u) ? 'bg-emerald-500 group-hover:bg-emerald-600' : 'bg-slate-300 dark:bg-slate-600 group-hover:bg-slate-400'}`}>
                             <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform duration-200
-                              ${u.is_active ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                              ${isActive(u) ? 'translate-x-5' : 'translate-x-0.5'}`} />
                           </span>
-                          <span className={`text-xs font-medium ${u.is_active ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-400'}`}>
-                            {u.is_active ? 'Activo' : 'Inactivo'}
+                          <span className={`text-xs font-medium ${isActive(u) ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-400'}`}>
+                            {isActive(u) ? 'Activo' : 'Inactivo'}
                           </span>
                         </button>
                       ) : (
-                        <span className={`inline-flex items-center gap-1 text-xs font-medium ${u.is_active ? 'text-emerald-600' : 'text-slate-400'}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${u.is_active ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                          {u.is_active ? 'Activo' : 'Inactivo'}
+                        <span className={`inline-flex items-center gap-1 text-xs font-medium ${isActive(u) ? 'text-emerald-600' : 'text-slate-400'}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${isActive(u) ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                          {isActive(u) ? 'Activo' : 'Inactivo'}
                         </span>
                       )}
                     </td>

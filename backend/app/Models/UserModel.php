@@ -56,4 +56,24 @@ class UserModel extends Model
         return $this->select('id, username, email, first_name, last_name, position, department, role, is_active')
                     ->findAll();
     }
+
+    /**
+     * Castea campos enteros que MySQLi devuelve como string.
+     * MySQLi siempre devuelve TINYINT/INT como string; json_encode los serializa
+     * como string también, lo que hace que "0" sea truthy en JavaScript.
+     */
+    public static function castRow(array $row): array
+    {
+        foreach (['id', 'is_active', 'is_verified', 'years_experience'] as $field) {
+            if (array_key_exists($field, $row)) {
+                $row[$field] = $row[$field] === null ? null : (int) $row[$field];
+            }
+        }
+        return $row;
+    }
+
+    public static function castRows(array $rows): array
+    {
+        return array_map([self::class, 'castRow'], $rows);
+    }
 }

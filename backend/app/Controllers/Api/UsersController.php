@@ -53,11 +53,15 @@ class UsersController extends BaseController
 
             $sql .= ' ORDER BY u.first_name, u.last_name';
 
-            return $this->response->setJSON($db->query($sql, $params)->getResultArray());
+            return $this->response->setJSON(
+                UserModel::castRows($db->query($sql, $params)->getResultArray())
+            );
         }
 
         // ADMIN / DIRECTOR / PM: full list
-        $builder = $this->model->select('id, username, email, first_name, last_name, phone, position, department, role, is_active, created_at');
+        $builder = $this->model->select(
+            'id, username, email, first_name, last_name, phone, position, department, role, is_active, created_at'
+        );
 
         if ($search) {
             $builder->groupStart()
@@ -72,7 +76,7 @@ class UsersController extends BaseController
             $builder->where('role', $role);
         }
 
-        return $this->response->setJSON($builder->findAll());
+        return $this->response->setJSON(UserModel::castRows($builder->findAll()));
     }
 
     /** GET /api/users/{id} */
@@ -82,7 +86,7 @@ class UsersController extends BaseController
         if (!$user) {
             return $this->response->setStatusCode(404)->setJSON(['message' => 'Usuario no encontrado']);
         }
-        return $this->response->setJSON($user);
+        return $this->response->setJSON(UserModel::castRow($user));
     }
 
     /** POST /api/admin/users  — admin creates user */
@@ -115,7 +119,9 @@ class UsersController extends BaseController
             'is_verified'=> 1,
         ]);
 
-        return $this->response->setStatusCode(201)->setJSON($this->model->safeFind($id));
+        return $this->response->setStatusCode(201)->setJSON(
+            UserModel::castRow($this->model->safeFind($id))
+        );
     }
 
     /** PATCH /api/admin/users/{id} */
@@ -149,7 +155,7 @@ class UsersController extends BaseController
             $this->model->update($id, $update);
         }
 
-        return $this->response->setJSON($this->model->safeFind($id));
+        return $this->response->setJSON(UserModel::castRow($this->model->safeFind($id)));
     }
 
     /** DELETE /api/admin/users/{id}  — soft delete (deactivate) */
@@ -176,7 +182,7 @@ class UsersController extends BaseController
             return $this->response->setStatusCode(404)->setJSON(['message' => 'Usuario no encontrado']);
         }
         $this->model->update($id, ['is_active' => 1]);
-        return $this->response->setJSON($this->model->safeFind($id));
+        return $this->response->setJSON(UserModel::castRow($this->model->safeFind($id)));
     }
 
     /** POST /api/admin/users/{id}/reset-password — admin envía enlace de recuperación */
