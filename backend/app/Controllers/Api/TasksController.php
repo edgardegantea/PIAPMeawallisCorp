@@ -32,19 +32,19 @@ class TasksController extends BaseController
     }
 
     /**
-     * Returns the user_id to filter tasks by, or null if the caller can see all tasks.
-     * ADMINs, the project director, and project PMs see everything.
-     * Any other MEMBER only sees their own assigned tasks.
+     * Devuelve el user_id para filtrar tareas, o null si puede ver todas.
+     * ADMIN, director del proyecto y PM ven todo.
+     * Cualquier otro MEMBER solo ve sus propias tareas.
      */
     private function resolveTaskFilter(int $sprintId): ?int
     {
-        $user = \App\Libraries\Auth::user();
+        $user = Auth::user();
 
         if ($user['role'] === 'ADMIN') {
             return null;
         }
 
-        $userId = \App\Libraries\Auth::id();
+        $userId = Auth::id();
         $db     = Database::connect();
 
         $row = $db->query(
@@ -67,8 +67,7 @@ class TasksController extends BaseController
     {
         $db   = Database::connect();
         $task = $db->table('tasks t')
-            ->select('t.*, u.username as assignee_username, u.first_name as assignee_first_name, u.last_name as assignee_last_name')
-            ->join('users u', 'u.id = t.assigned_to', 'left')
+            ->select('t.*')
             ->where('t.id', $id)
             ->get()->getRowArray();
 
@@ -76,15 +75,21 @@ class TasksController extends BaseController
             return $this->response->setStatusCode(404)->setJSON(['message' => 'Tarea no encontrada']);
         }
 
-        $task['comments'] = (new TaskCommentModel())->findByTask($id);
+        // Asignados
+        $task['assignees'] = $db->query('
+            SELECT ta.user_id, u.first_name, u.last_name, u.username
+            FROM task_assignees ta
+            JOIN users u ON u.id = ta.user_id
+            WHERE ta.task_id = ?', [$id])->getResultArray();
+
+        $task['comments']      = (new TaskCommentModel())->findByTask($id);
         $task['comment_count'] = count($task['comments']);
 
         return $this->response->setJSON($task);
     }
 
     /**
-     * GET /api/tasks/my — tareas asignadas al usuario autenticado (todos los proyectos).
-     * Acepta ?status=PENDIENTE|EN_PROGRESO|BLOQUEADA|COMPLETADA (opcional).
+     * GET /api/tasks/my — tareas asignadas al usuario autenticado.
      */
     public function myTasks(): ResponseInterface
     {
@@ -92,29 +97,29 @@ class TasksController extends BaseController
         $db     = Database::connect();
         $status = $this->request->getGet('status');
 
-        $sql    = "
+        $sql = "
             SELECT t.*,
                    s.name     AS sprint_name,
                    s.number   AS sprint_number,
                    p.id       AS project_id,
                    p.name     AS project_name,
-                   p.code     AS project_code,
-                   u.first_name AS assignee_first_name,
-                   u.last_name  AS assignee_last_name
-            FROM   tasks t
-            JOIN   sprints  s ON s.id  = t.sprint_id
-            JOIN   projects p ON p.id  = s.project_id
-            LEFT JOIN users u ON u.id  = t.assigned_to
-            WHERE  t.assigned_to = ?
-              AND  p.is_active   = 1
+                   p.code     AS project_code
+            FROM tasks t
+            JOIN sprints  s ON s.id = t.sprint_id
+            JOIN projects p ON p.id = s.project_id
+            WHERE EXISTS (
+                SELECT 1 FROM task_assignees ta
+                WHERE ta.task_id = t.id AND ta.user_id = ?
+            )
+            AND p.is_active = 1
         ";
         $params = [$userId];
 
         if ($status) {
-            $sql   .= ' AND t.status = ?';
+            $sql    .= ' AND t.status = ?';
             $params[] = $status;
         } else {
-            $sql   .= " AND t.status != 'COMPLETADA'";
+            $sql .= " AND t.status != 'COMPLETADA'";
         }
 
         $sql .= "
@@ -129,6 +134,26 @@ class TasksController extends BaseController
         ";
 
         $tasks = $db->query($sql, $params)->getResultArray();
+
+        if (!empty($tasks)) {
+            $ids       = implode(',', array_column($tasks, 'id'));
+            $assignees = $db->query("
+                SELECT ta.task_id, u.id AS user_id, u.first_name, u.last_name, u.username
+                FROM task_assignees ta
+                JOIN users u ON u.id = ta.user_id
+                WHERE ta.task_id IN ({$ids})
+            ")->getResultArray();
+
+            $byTask = [];
+            foreach ($assignees as $a) {
+                $byTask[$a['task_id']][] = $a;
+            }
+            foreach ($tasks as &$t) {
+                $t['assignees'] = $byTask[$t['id']] ?? [];
+            }
+            unset($t);
+        }
+
         return $this->response->setJSON($tasks);
     }
 
@@ -146,19 +171,31 @@ class TasksController extends BaseController
             return ProjectGate::deny($this->response);
         }
 
-        $id   = $this->model->insert($data);
-        $task = $this->model->find($id);
+        // Extraer assignees antes de insertar
+        $assigneeIds = isset($data['assignees']) ? array_values(array_filter((array) $data['assignees'], 'is_numeric')) : [];
+        unset($data['assignees']);
 
-        // Activity log — resolve project_id via sprint
+        // Mantener assigned_to = primer asignado (retrocompat)
+        if (!empty($assigneeIds) && empty($data['assigned_to'])) {
+            $data['assigned_to'] = (int) $assigneeIds[0];
+        }
+
+        $id   = $this->model->insert($data);
+        $this->syncAssignees((int) $id, $assigneeIds);
+
+        $task             = $this->model->find($id);
+        $task['assignees'] = $this->getAssignees((int) $id);
+
+        // Activity log
         if (!empty($task['sprint_id'])) {
             $db     = Database::connect();
             $sprint = $db->table('sprints')->select('project_id')->where('id', $task['sprint_id'])->get()->getRowArray();
             if ($sprint) {
                 ActivityLogger::log(
-                    (int)$sprint['project_id'],
+                    (int) $sprint['project_id'],
                     'task.created',
                     'task',
-                    (int)$id,
+                    (int) $id,
                     'Tarea creada: ' . ($task['title'] ?? '')
                 );
             }
@@ -174,19 +211,39 @@ class TasksController extends BaseController
             return $this->response->setStatusCode(404)->setJSON(['message' => 'Tarea no encontrada']);
         }
 
-        // TEAM_MEMBER may update only their own assigned tasks
+        // TEAM_MEMBER solo puede editar tareas donde esté asignado
         $userId    = Auth::id();
         $projectId = ProjectGate::projectIdFromTask($id);
         if ($projectId && !ProjectGate::canWrite($projectId)) {
-            if ((int) $task['assigned_to'] !== $userId) {
+            $isAssigned = (int) $task['assigned_to'] === $userId;
+            if (!$isAssigned) {
+                $db         = Database::connect();
+                $isAssigned = (bool) $db->table('task_assignees')
+                    ->where('task_id', $id)->where('user_id', $userId)
+                    ->countAllResults();
+            }
+            if (!$isAssigned) {
                 return ProjectGate::deny($this->response);
             }
         }
 
-        $before = $this->model->find($id);
-        $data   = $this->request->getJSON(true) ?? $this->request->getPost();
+        $before      = $task;
+        $data        = $this->request->getJSON(true) ?? $this->request->getPost();
+        $assigneeIds = null;
+
+        if (isset($data['assignees'])) {
+            $assigneeIds = array_values(array_filter((array) $data['assignees'], 'is_numeric'));
+            unset($data['assignees']);
+        }
+
         $this->model->update($id, $data);
-        $after  = $this->model->find($id);
+
+        if ($assigneeIds !== null) {
+            $this->syncAssignees($id, $assigneeIds);
+        }
+
+        $after             = $this->model->find($id);
+        $after['assignees'] = $this->getAssignees($id);
 
         // Log status changes
         if (isset($data['status']) && $data['status'] !== $before['status']) {
@@ -194,7 +251,7 @@ class TasksController extends BaseController
             $sprint = $db->table('sprints')->select('project_id')->where('id', $after['sprint_id'])->get()->getRowArray();
             if ($sprint) {
                 ActivityLogger::log(
-                    (int)$sprint['project_id'],
+                    (int) $sprint['project_id'],
                     'task.status_changed',
                     'task',
                     $id,
@@ -219,5 +276,34 @@ class TasksController extends BaseController
 
         $this->model->delete($id);
         return $this->response->setStatusCode(204)->setBody('');
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /**
+     * Sincroniza task_assignees y mantiene assigned_to = primer asignado.
+     */
+    private function syncAssignees(int $taskId, array $userIds): void
+    {
+        $db = Database::connect();
+        $db->table('task_assignees')->where('task_id', $taskId)->delete();
+
+        if (!empty($userIds)) {
+            $rows = array_map(fn($uid) => ['task_id' => $taskId, 'user_id' => (int) $uid], $userIds);
+            $db->table('task_assignees')->insertBatch($rows);
+            $this->model->update($taskId, ['assigned_to' => (int) $userIds[0]]);
+        } else {
+            $this->model->update($taskId, ['assigned_to' => null]);
+        }
+    }
+
+    /** Devuelve el array de asignados de una tarea. */
+    private function getAssignees(int $taskId): array
+    {
+        return Database::connect()->query('
+            SELECT ta.user_id, u.first_name, u.last_name, u.username
+            FROM task_assignees ta
+            JOIN users u ON u.id = ta.user_id
+            WHERE ta.task_id = ?', [$taskId])->getResultArray();
     }
 }

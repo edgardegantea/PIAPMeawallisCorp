@@ -57,7 +57,7 @@ export default function KanbanBoard({ projectId, isManager = true }) {
 
   const filteredTasks = tasks
     .filter((t) => !priorityFilter  || t.priority === priorityFilter)
-    .filter((t) => !onlyMine        || String(t.assigned_to) === String(user?.id));
+    .filter((t) => !onlyMine        || (t.assignees || []).some((a) => String(a.user_id) === String(user?.id)));
 
   const addTask = async (status) => {
     const title = newTask.title.trim();
@@ -186,8 +186,7 @@ export default function KanbanBoard({ projectId, isManager = true }) {
               { key: 'title',               label: 'Título' },
               { key: 'status',              label: 'Estado' },
               { key: 'priority',            label: 'Prioridad' },
-              { key: 'assignee_first_name', label: 'Asignado (Nombre)' },
-              { key: 'assignee_last_name',  label: 'Asignado (Apellido)' },
+              { key: 'assignees', label: 'Asignados', transform: (v) => (v || []).map((a) => `${a.first_name} ${a.last_name}`).join(' | ') },
               { key: 'due_date',            label: 'Fecha Límite' },
               { key: 'estimated_hours',     label: 'Horas Estimadas' },
               { key: 'time_logged',         label: 'Horas Registradas' },
@@ -300,11 +299,24 @@ export default function KanbanBoard({ projectId, isManager = true }) {
                         </div>
                       )}
 
-                      {/* Assignee */}
-                      {task.assignee_username && (
-                        <p className="text-xs text-slate-400 mt-1 pl-5 truncate">
-                          {task.assignee_first_name} {task.assignee_last_name}
-                        </p>
+                      {/* Assignees (multi) */}
+                      {(task.assignees || []).length > 0 && (
+                        <div className="flex items-center gap-0.5 mt-1.5 pl-5">
+                          {task.assignees.slice(0, 4).map((a, i) => (
+                            <div key={a.user_id}
+                              title={`${a.first_name} ${a.last_name}`}
+                              className="w-5 h-5 rounded-full flex items-center justify-center
+                                text-white text-[9px] font-bold ring-1 ring-white -ml-1 first:ml-0"
+                              style={{ background: ['#6366f1','#8b5cf6','#3b82f6','#10b981','#f59e0b','#ec4899'][i % 6] }}>
+                              {(a.first_name?.[0] || '')}{(a.last_name?.[0] || '')}
+                            </div>
+                          ))}
+                          {task.assignees.length > 4 && (
+                            <span className="text-[10px] text-slate-400 ml-1">
+                              +{task.assignees.length - 4}
+                            </span>
+                          )}
+                        </div>
                       )}
 
                       {/* Delete button — shown on hover, stops propagation */}

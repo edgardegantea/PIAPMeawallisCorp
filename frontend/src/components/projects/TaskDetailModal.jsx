@@ -3,7 +3,7 @@ import { projectsAPI } from '../../services/projectsAPI';
 import { useAuthStore } from '../../stores/authStore';
 import { toast } from 'sonner';
 import {
-  X, Send, Trash2, Clock, Flag, Calendar, User, CheckSquare,
+  X, Send, Trash2, Clock, Flag, Calendar, Users, CheckSquare,
   Plus, Tag, AlarmClock, MessageSquare, Save,
 } from 'lucide-react';
 
@@ -27,12 +27,20 @@ const TABS = [
   { id: 'comentarios', icon: MessageSquare, label: 'Comentarios' },
 ];
 
+const AVATAR_COLORS = ['bg-indigo-500','bg-purple-500','bg-blue-500','bg-emerald-500','bg-amber-500','bg-rose-500'];
+
 export default function TaskDetailModal({ task, projectId, onClose, onSaved }) {
   const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState('detalles');
   const [form, setForm]           = useState({ ...task });
   const [members, setMembers]     = useState([]);
   const [saving, setSaving]       = useState(false);
+
+  // Multi-assignee state — initialized from task.assignees or task.assigned_to
+  const [assignees, setAssignees] = useState(() => {
+    if (task.assignees?.length > 0) return task.assignees.map((a) => String(a.user_id));
+    return task.assigned_to ? [String(task.assigned_to)] : [];
+  });
 
   // ── Checklist ──────────────────────────────────────────────
   const [checklists, setChecklists]   = useState([]);
@@ -98,6 +106,13 @@ export default function TaskDetailModal({ task, projectId, onClose, onSaved }) {
     return () => document.removeEventListener('mousedown', h);
   }, []);
 
+  const toggleAssignee = (uid) => {
+    const s = String(uid);
+    setAssignees((prev) =>
+      prev.includes(s) ? prev.filter((id) => id !== s) : [...prev, s]
+    );
+  };
+
   // ── Save ───────────────────────────────────────────────────
   const save = async () => {
     setSaving(true);
@@ -107,7 +122,7 @@ export default function TaskDetailModal({ task, projectId, onClose, onSaved }) {
         status: form.status, priority: form.priority,
         due_date: form.due_date || null,
         estimated_hours: form.estimated_hours,
-        assigned_to: form.assigned_to || null,
+        assignees: assignees.map(Number),
         labels: form.labels || '[]',
       });
       toast.success('Tarea guardada');
@@ -288,21 +303,68 @@ export default function TaskDetailModal({ task, projectId, onClose, onSaved }) {
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
               </div>
 
-              {/* Assignee */}
+              {/* Multi-assignee */}
               <div>
-                <label className="flex items-center gap-1 text-xs font-medium text-slate-600 mb-1">
-                  <User size={12} /> Asignado a
+                <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600 mb-2">
+                  <Users size={12} />
+                  Asignados
+                  {assignees.length > 0 && (
+                    <span className="ml-1 bg-indigo-100 text-indigo-700 text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
+                      {assignees.length}
+                    </span>
+                  )}
                 </label>
-                <select value={form.assigned_to || ''}
-                  onChange={(e) => setForm({ ...form, assigned_to: e.target.value || null })}
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
-                  <option value="">Sin asignar</option>
-                  {members.map((m) => (
-                    <option key={m.user_id || m.id} value={m.user_id || m.id}>
-                      {m.first_name} {m.last_name}
-                    </option>
-                  ))}
-                </select>
+
+                {/* Selected chips */}
+                {assignees.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {assignees.map((uid, i) => {
+                      const m = members.find((mb) => String(mb.user_id || mb.id) === uid);
+                      if (!m) return null;
+                      return (
+                        <span key={uid}
+                          className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+                          <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-white text-[8px] font-bold ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>
+                            {(m.first_name?.[0] || '')}{(m.last_name?.[0] || '')}
+                          </span>
+                          {m.first_name} {m.last_name}
+                          <button type="button" onClick={() => toggleAssignee(uid)}
+                            className="opacity-60 hover:opacity-100 ml-0.5">
+                            <X size={10} />
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Member checkbox list */}
+                <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 max-h-40 overflow-y-auto">
+                  {members.length === 0 ? (
+                    <p className="text-xs text-slate-400 text-center py-3">Sin miembros disponibles</p>
+                  ) : (
+                    members.map((m, i) => {
+                      const uid     = String(m.user_id || m.id);
+                      const checked = assignees.includes(uid);
+                      return (
+                        <label key={uid}
+                          className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors
+                            ${checked ? 'bg-indigo-50' : 'hover:bg-slate-50'}`}>
+                          <input type="checkbox" checked={checked}
+                            onChange={() => toggleAssignee(uid)}
+                            className="accent-indigo-600 flex-shrink-0" />
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center
+                            text-[10px] font-bold text-white flex-shrink-0 ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>
+                            {(m.first_name?.[0] || '')}{(m.last_name?.[0] || '')}
+                          </div>
+                          <span className="text-sm text-slate-700 leading-tight">
+                            {m.first_name} {m.last_name}
+                          </span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
               </div>
 
               {/* Status / Priority / Due date */}

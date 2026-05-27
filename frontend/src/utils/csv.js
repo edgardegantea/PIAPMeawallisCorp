@@ -14,7 +14,7 @@ export function downloadCSV(rows, columns, filename) {
 
   const header = columns.map((c) => escape(c.label)).join(',');
   const body   = rows.map((row) =>
-    columns.map((c) => escape(row[c.key])).join(',')
+    columns.map((c) => escape(c.transform ? c.transform(row[c.key]) : row[c.key])).join(',')
   ).join('\n');
 
   const csv  = '﻿' + header + '\n' + body; // BOM para Excel en Windows
