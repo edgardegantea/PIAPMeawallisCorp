@@ -43,25 +43,51 @@ class TimeLogsController extends BaseController
             return $this->response->setStatusCode(404)->setJSON(['message' => 'Tarea no encontrada']);
         }
 
-        $data  = $this->request->getJSON(true) ?? $this->request->getPost();
-        $rules = [
-            'hours'     => 'required|decimal|greater_than[0]',
-            'work_date' => 'required|valid_date',
-        ];
-
-        if (!$this->validate($rules)) {
-            return $this->response->setStatusCode(422)->setJSON(['errors' => $this->validator->getErrors()]);
+        $data = $this->request->getJSON(true);
+        if (empty($data) || !is_array($data)) {
+            $data = $this->request->getPost() ?: [];
         }
 
-        $data['task_id'] = $taskId;
-        $data['user_id'] = Auth::id();
+        // Validación explícita en PHP para evitar problemas de tipos con CI4
+        $hours    = isset($data['hours']) ? (float) $data['hours'] : 0;
+        $workDate = trim((string) ($data['work_date'] ?? ''));
 
-        $id = $this->model->insert($data);
+        if ($hours <= 0) {
+            return $this->response->setStatusCode(422)
+                ->setJSON(['message' => 'Las horas deben ser mayores a 0']);
+        }
+        if (!$workDate || strtotime($workDate) === false) {
+            return $this->response->setStatusCode(422)
+                ->setJSON(['message' => 'Fecha de trabajo inválida']);
+        }
 
-        // Recalculate task's time_logged
-        $this->syncTimeLogged($taskId);
+        $insert = [
+            'task_id'     => $taskId,
+            'user_id'     => Auth::id(),
+            'hours'       => round($hours, 2),
+            'work_date'   => date('Y-m-d', strtotime($workDate)),
+            'description' => mb_substr(trim((string) ($data['description'] ?? '')), 0, 500) ?: null,
+        ];
 
-        return $this->response->setStatusCode(201)->setJSON($this->model->findByTask($taskId)[0] ?? $this->model->find($id));
+        try {
+            $id = $this->model->insert($insert);
+            if (!$id) {
+                return $this->response->setStatusCode(500)
+                    ->setJSON(['message' => 'No se pudo insertar el registro de tiempo']);
+            }
+
+            // Recalculate task's time_logged
+            $this->syncTimeLogged($taskId);
+
+            $logs = $this->model->findByTask($taskId);
+            $new  = count($logs) ? $logs[0] : $this->model->find($id);
+
+            return $this->response->setStatusCode(201)->setJSON($new);
+        } catch (\Throwable $e) {
+            log_message('error', '[TimeLogsController::create] ' . $e->getMessage() . ' | ' . $e->getFile() . ':' . $e->getLine());
+            return $this->response->setStatusCode(500)
+                ->setJSON(['message' => 'Error al guardar el tiempo: ' . $e->getMessage()]);
+        }
     }
 
     public function update(int $id): ResponseInterface
@@ -71,23 +97,36 @@ class TimeLogsController extends BaseController
             return $this->response->setStatusCode(404)->setJSON(['message' => 'Registro no encontrado']);
         }
 
-        if ((int)$log['user_id'] !== Auth::id()) {
+        if ((int) $log['user_id'] !== Auth::id()) {
             return $this->response->setStatusCode(403)->setJSON(['message' => 'No autorizado']);
         }
 
         $data    = $this->request->getJSON(true) ?? $this->request->getPost();
-        $allowed = array_intersect_key($data, array_flip(['hours', 'work_date', 'description']));
+        $allowed = [];
+
+        if (isset($data['hours'])) {
+            $h = round((float) $data['hours'], 2);
+            if ($h > 0) $allowed['hours'] = $h;
+        }
+        if (isset($data['work_date'])) {
+            $allowed['work_date'] = date('Y-m-d', strtotime($data['work_date']));
+        }
+        if (array_key_exists('description', $data)) {
+            $allowed['description'] = mb_substr(trim((string) $data['description']), 0, 500) ?: null;
+        }
 
         if (empty($allowed)) {
             return $this->response->setStatusCode(422)->setJSON(['message' => 'Nada que actualizar']);
         }
 
-        $this->model->update($id, $allowed);
-
-        // Recalculate after update
-        $this->syncTimeLogged((int)$log['task_id']);
-
-        return $this->response->setJSON($this->model->find($id));
+        try {
+            $this->model->update($id, $allowed);
+            $this->syncTimeLogged((int) $log['task_id']);
+            return $this->response->setJSON($this->model->find($id));
+        } catch (\Throwable $e) {
+            log_message('error', '[TimeLogsController::update] ' . $e->getMessage());
+            return $this->response->setStatusCode(500)->setJSON(['message' => $e->getMessage()]);
+        }
     }
 
     public function delete(int $id): ResponseInterface
@@ -97,17 +136,20 @@ class TimeLogsController extends BaseController
             return $this->response->setStatusCode(404)->setJSON(['message' => 'Registro no encontrado']);
         }
 
-        if ((int)$log['user_id'] !== Auth::id()) {
+        if ((int) $log['user_id'] !== Auth::id()) {
             return $this->response->setStatusCode(403)->setJSON(['message' => 'No autorizado']);
         }
 
-        $taskId = (int)$log['task_id'];
-        $this->model->delete($id);
+        $taskId = (int) $log['task_id'];
 
-        // Recalculate after deletion
-        $this->syncTimeLogged($taskId);
-
-        return $this->response->setStatusCode(204)->setBody('');
+        try {
+            $this->model->delete($id);
+            $this->syncTimeLogged($taskId);
+            return $this->response->setStatusCode(204)->setBody('');
+        } catch (\Throwable $e) {
+            log_message('error', '[TimeLogsController::delete] ' . $e->getMessage());
+            return $this->response->setStatusCode(500)->setJSON(['message' => $e->getMessage()]);
+        }
     }
 
     // ─── Private helpers ─────────────────────────────────────────────────────
