@@ -33,6 +33,7 @@ class EpicsController extends BaseController
         foreach ($epics as &$epic) {
             $epic['backlog_count'] = $backlogModel->where('epic_id', $epic['id'])->countAllResults();
         }
+        unset($epic); // liberar referencia del foreach para evitar efectos secundarios
 
         return $this->response->setJSON($epics);
     }

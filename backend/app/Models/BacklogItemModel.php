@@ -10,8 +10,10 @@ class BacklogItemModel extends Model
     protected $primaryKey    = 'id';
     protected $returnType    = 'array';
     protected $allowedFields = [
-        'project_id', 'sprint_id', 'title', 'description',
-        'acceptance_criteria', 'priority', 'story_points', 'status', 'order',
+        'project_id', 'sprint_id', 'epic_id',
+        'title', 'description', 'acceptance_criteria',
+        'user_role', 'user_action', 'user_benefit',
+        'priority', 'story_points', 'status', 'order',
     ];
     protected $useTimestamps = true;
     protected $createdField  = 'created_at';
