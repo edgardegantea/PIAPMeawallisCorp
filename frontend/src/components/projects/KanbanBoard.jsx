@@ -377,6 +377,7 @@ export default function KanbanBoard({ projectId, isManager = true }) {
         <TaskDetailModal
           task={selectedTask}
           projectId={projectId}
+          isManager={isManager}
           onClose={() => setSelectedTask(null)}
           onSaved={() => { loadTasks(sprintId); setSelectedTask(null); }}
         />

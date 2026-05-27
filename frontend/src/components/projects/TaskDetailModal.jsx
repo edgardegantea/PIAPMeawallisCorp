@@ -58,7 +58,7 @@ function TaskStatusChip({ status }) {
 }
 
 // ── Main modal ────────────────────────────────────────────────────────────────
-export default function TaskDetailModal({ task, projectId, onClose, onSaved }) {
+export default function TaskDetailModal({ task, projectId, isManager = true, onClose, onSaved }) {
   const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState('detalles');
   const [form, setForm]           = useState({ ...task });
@@ -192,14 +192,17 @@ export default function TaskDetailModal({ task, projectId, onClose, onSaved }) {
   const save = async () => {
     setSaving(true);
     try {
-      await projectsAPI.updateTask(task.id, {
+      const payload = {
         title: form.title, description: form.description,
         status: form.status, priority: form.priority,
         due_date: form.due_date || null,
         estimated_hours: form.estimated_hours,
-        assignees: assignees.map(Number),
         labels: form.labels || '[]',
-      });
+      };
+      // Solo managers pueden cambiar asignados
+      if (isManager) payload.assignees = assignees.map(Number);
+
+      await projectsAPI.updateTask(task.id, payload);
       toast.success('Tarea guardada');
       onSaved?.();
     } catch { toast.error('Error al guardar'); }
@@ -454,47 +457,74 @@ export default function TaskDetailModal({ task, projectId, onClose, onSaved }) {
                     </span>
                   )}
                 </label>
-                {assignees.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mb-2">
-                    {assignees.map((uid, i) => {
-                      const m = members.find((mb) => String(mb.user_id || mb.id) === uid);
-                      if (!m) return null;
-                      return (
-                        <span key={uid}
-                          className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300">
-                          <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-white text-[8px] font-bold ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>
-                            {(m.first_name?.[0] || '')}{(m.last_name?.[0] || '')}
+
+                {/* ── Solo lectura (TEAM MEMBER) ── */}
+                {!isManager ? (
+                  assignees.length === 0 ? (
+                    <p className="text-xs text-slate-400 italic">Sin asignados</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {assignees.map((uid, i) => {
+                        const m = members.find((mb) => String(mb.user_id || mb.id) === uid);
+                        if (!m) return null;
+                        return (
+                          <span key={uid}
+                            className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                            <span className={`w-4 h-4 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0 ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>
+                              {(m.first_name?.[0] || '')}{(m.last_name?.[0] || '')}
+                            </span>
+                            {m.first_name} {m.last_name}
                           </span>
-                          {m.first_name} {m.last_name}
-                          <button type="button" onClick={() => toggleAssignee(uid)} className="opacity-60 hover:opacity-100 ml-0.5">
-                            <X size={10} />
-                          </button>
-                        </span>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )
+                ) : (
+                  /* ── Editable (managers) ── */
+                  <>
+                    {assignees.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {assignees.map((uid, i) => {
+                          const m = members.find((mb) => String(mb.user_id || mb.id) === uid);
+                          if (!m) return null;
+                          return (
+                            <span key={uid}
+                              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300">
+                              <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-white text-[8px] font-bold ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>
+                                {(m.first_name?.[0] || '')}{(m.last_name?.[0] || '')}
+                              </span>
+                              {m.first_name} {m.last_name}
+                              <button type="button" onClick={() => toggleAssignee(uid)} className="opacity-60 hover:opacity-100 ml-0.5">
+                                <X size={10} />
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <div className="border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-700 max-h-40 overflow-y-auto">
+                      {members.length === 0 ? (
+                        <p className="text-xs text-slate-400 text-center py-3">Sin miembros disponibles</p>
+                      ) : members.map((m, i) => {
+                        const uid     = String(m.user_id || m.id);
+                        const checked = assignees.includes(uid);
+                        return (
+                          <label key={uid}
+                            className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors
+                              ${checked ? 'bg-indigo-50 dark:bg-indigo-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
+                            <input type="checkbox" checked={checked} onChange={() => toggleAssignee(uid)} className="accent-indigo-600 flex-shrink-0" />
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>
+                              {(m.first_name?.[0] || '')}{(m.last_name?.[0] || '')}
+                            </div>
+                            <span className="text-sm text-slate-700 dark:text-slate-300 leading-tight">
+                              {m.first_name} {m.last_name}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </>
                 )}
-                <div className="border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-700 max-h-40 overflow-y-auto">
-                  {members.length === 0 ? (
-                    <p className="text-xs text-slate-400 text-center py-3">Sin miembros disponibles</p>
-                  ) : members.map((m, i) => {
-                    const uid     = String(m.user_id || m.id);
-                    const checked = assignees.includes(uid);
-                    return (
-                      <label key={uid}
-                        className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors
-                          ${checked ? 'bg-indigo-50 dark:bg-indigo-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
-                        <input type="checkbox" checked={checked} onChange={() => toggleAssignee(uid)} className="accent-indigo-600 flex-shrink-0" />
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>
-                          {(m.first_name?.[0] || '')}{(m.last_name?.[0] || '')}
-                        </div>
-                        <span className="text-sm text-slate-700 dark:text-slate-300 leading-tight">
-                          {m.first_name} {m.last_name}
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
               </div>
 
               {/* Status / Priority / Due date */}

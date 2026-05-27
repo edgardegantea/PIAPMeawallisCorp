@@ -232,7 +232,10 @@ class TasksController extends BaseController
         $assigneeIds = null;
 
         if (isset($data['assignees'])) {
-            $assigneeIds = array_values(array_filter((array) $data['assignees'], 'is_numeric'));
+            // Solo managers/PM/Director/Admin pueden cambiar asignados
+            if ($projectId && ProjectGate::canWrite($projectId)) {
+                $assigneeIds = array_values(array_filter((array) $data['assignees'], 'is_numeric'));
+            }
             unset($data['assignees']);
         }
 
