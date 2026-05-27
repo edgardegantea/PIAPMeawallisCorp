@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { projectsAPI } from '../../services/projectsAPI';
 import { useAuthStore } from '../../stores/authStore';
 import { toast } from 'sonner';
-import { Plus, Trash2, Flag, Calendar, Clock, GripVertical, Download, User } from 'lucide-react';
+import { Plus, Trash2, Flag, Calendar, Clock, GripVertical, Download, User, AlertOctagon, Link2 } from 'lucide-react';
 import { downloadCSV } from '../../utils/csv';
 import TaskDetailModal from './TaskDetailModal';
+import { useActiveTimer, formatElapsed } from '../../hooks/useTimer';
 
 const COLUMNS = [
   { id: 'PENDIENTE',   label: 'Pendiente',   color: 'border-slate-300',  bg: 'bg-slate-50',   header: 'bg-slate-100 text-slate-600',  drop: 'border-slate-400  bg-slate-100'  },
@@ -24,6 +25,7 @@ const PRIORITIES = ['', 'BAJA', 'MEDIA', 'ALTA', 'CRITICA'];
 
 export default function KanbanBoard({ projectId, isManager = true }) {
   const { user }                        = useAuthStore();
+  const activeTimer                     = useActiveTimer();
   const [sprints, setSprints]           = useState([]);
   const [tasks, setTasks]               = useState([]);
   const [sprintId, setSprintId]         = useState('');
@@ -241,9 +243,10 @@ export default function KanbanBoard({ projectId, isManager = true }) {
 
               <div className="space-y-2 mb-2">
                 {colTasks.map((task) => {
-                  const pri       = PRIORITY_STYLES[task.priority];
-                  const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'COMPLETADA';
+                  const pri           = PRIORITY_STYLES[task.priority];
+                  const isOverdue     = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'COMPLETADA';
                   const isBeingDragged = String(draggingId) === String(task.id);
+                  const timerRunning  = activeTimer?.taskId === task.id;
 
                   return (
                     <div
@@ -265,6 +268,13 @@ export default function KanbanBoard({ projectId, isManager = true }) {
                           className="text-slate-300 group-hover:text-slate-400 mt-0.5 flex-shrink-0 transition-colors"
                         />
                         <p className="text-xs font-medium text-slate-700 line-clamp-2 flex-1">{task.title}</p>
+                        {/* Timer running indicator */}
+                        {timerRunning && (
+                          <span className="flex-shrink-0 flex items-center gap-0.5 bg-emerald-100 text-emerald-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            ⏱
+                          </span>
+                        )}
                       </div>
 
                       {/* Priority + due date */}

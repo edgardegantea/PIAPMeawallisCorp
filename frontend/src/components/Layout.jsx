@@ -3,11 +3,12 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useThemeStore } from '../stores/themeStore';
 import { projectsAPI } from '../services/projectsAPI';
+import { useActiveTimer, formatElapsed } from '../hooks/useTimer';
 import {
   LayoutDashboard, FolderKanban, Tag, User, LogOut,
   Menu, X, ChevronRight, BarChart2, Building2, Shield, Lock,
   Bell, AlertTriangle, Clock, Flag, Search, CheckSquare,
-  Sun, Moon, ListTodo, CalendarDays,
+  Sun, Moon, ListTodo, CalendarDays, Square,
 } from 'lucide-react';
 
 const SEVERITY_ICON = {
@@ -25,6 +26,17 @@ export default function Layout({ children }) {
   const { isDark, toggleTheme } = useThemeStore();
   const location                = useLocation();
   const navigate                = useNavigate();
+  const activeTimer             = useActiveTimer();
+
+  // Live elapsed for the floating chip
+  const [timerElapsed, setTimerElapsed] = useState(0);
+  useEffect(() => {
+    if (!activeTimer) { setTimerElapsed(0); return; }
+    const tick = () => setTimerElapsed(Math.floor((Date.now() - activeTimer.startedAt) / 1000));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [activeTimer]);
 
   const [sidebarOpen, setSidebarOpen]     = useState(true);
   const [mobileOpen, setMobileOpen]       = useState(false);
@@ -382,8 +394,37 @@ export default function Layout({ children }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto bg-slate-100 dark:bg-slate-950">
+        <main className="flex-1 overflow-y-auto bg-slate-100 dark:bg-slate-950 relative">
           {children}
+
+          {/* ── Floating active-timer chip ─────────────────────────── */}
+          {activeTimer && (
+            <div className="fixed bottom-5 right-5 z-40 flex items-center gap-3
+                            bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-700
+                            shadow-lg rounded-2xl px-4 py-2.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="font-mono text-base font-bold text-emerald-700 dark:text-emerald-400 tabular-nums leading-none">
+                  {formatElapsed(timerElapsed)}
+                </p>
+                {activeTimer.description && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 max-w-[160px] truncate">
+                    {activeTimer.description}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  // Stop timer without saving — user goes to the task to save properly
+                  localStorage.removeItem('active_timer');
+                  window.dispatchEvent(new Event('storage'));
+                }}
+                title="Cancelar timer"
+                className="text-slate-400 hover:text-red-500 transition-colors p-1 flex-shrink-0">
+                <Square size={14} />
+              </button>
+            </div>
+          )}
         </main>
       </div>
     </div>

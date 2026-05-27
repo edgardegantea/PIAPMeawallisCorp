@@ -163,6 +163,11 @@ $routes->group('api', ['filter' => 'auth'], function ($routes) {
     $routes->patch('timelogs/(:num)',           'Api\TimeLogsController::update/$1');
     $routes->delete('timelogs/(:num)',          'Api\TimeLogsController::delete/$1');
 
+    // Task Dependencies
+    $routes->get('tasks/(:num)/dependencies',    'Api\TaskDependenciesController::index/$1');
+    $routes->post('tasks/(:num)/dependencies',   'Api\TaskDependenciesController::create/$1');
+    $routes->delete('dependencies/(:num)',        'Api\TaskDependenciesController::delete/$1');
+
     // Activity Log
     $routes->get('projects/(:num)/activity',   'Api\ActivityController::index/$1');
     $routes->put('activity/(:num)',            'Api\ActivityController::update/$1');

@@ -99,6 +99,11 @@ export const projectsAPI = {
   updateTimeLog:  (id, d)       => api.patch(`/timelogs/${id}`, d),
   deleteTimeLog:  (id)          => api.delete(`/timelogs/${id}`),
 
+  // Task dependencies
+  getTaskDependencies:    (taskId)      => api.get(`/tasks/${taskId}/dependencies`),
+  createTaskDependency:   (taskId, d)   => api.post(`/tasks/${taskId}/dependencies`, d),
+  deleteTaskDependency:   (id)          => api.delete(`/dependencies/${id}`),
+
   // Activity
   getActivity:    (projectId)   => api.get(`/projects/${projectId}/activity`),
   updateActivity: (id, data)    => api.put(`/activity/${id}`, data),
