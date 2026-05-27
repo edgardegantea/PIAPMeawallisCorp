@@ -7,7 +7,8 @@ import ConfirmModal from '../components/ConfirmModal';
 import { toast } from 'sonner';
 import {
   Plus, Search, Edit2, X, Save,
-  Eye, EyeOff, Shield, KeyRound,
+  Eye, EyeOff, Shield, KeyRound, Trash2,
+  AlertTriangle, UserCheck, Users, Clock, MessageSquare,
 } from 'lucide-react';
 
 const ROLES = ['ADMIN', 'DIRECTOR', 'PM', 'TEAM_MEMBER'];
@@ -25,6 +26,162 @@ const EMPTY_FORM = {
   last_name: '', phone: '', role: 'TEAM_MEMBER', position: '', department: '',
 };
 
+/* ─── DeleteUserModal ─────────────────────────────────────────────────────── */
+function DeleteUserModal({ targetUser, allUsers, onClose, onDeleted }) {
+  const [info, setInfo]         = useState(null);   // assignments summary
+  const [loadingInfo, setLoadingInfo] = useState(true);
+  const [transferTo, setTransferTo]   = useState('');
+  const [deleting, setDeleting]       = useState(false);
+
+  useEffect(() => {
+    projectsAPI.adminGetUserAssignments(targetUser.id)
+      .then((r) => { setInfo(r.data); setLoadingInfo(false); })
+      .catch(() => { toast.error('Error al cargar asignaciones'); onClose(); });
+  }, [targetUser.id]);
+
+  const transferOptions = useMemo(
+    () => allUsers.filter((u) => u.id !== targetUser.id && Number(u.is_active) === 1),
+    [allUsers, targetUser.id]
+  );
+
+  const canDelete = !loadingInfo && (!info?.transfer_required || transferTo !== '');
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      const body = transferTo ? { transfer_to: Number(transferTo) } : {};
+      await projectsAPI.adminHardDeleteUser(targetUser.id, body);
+      toast.success(`Usuario ${targetUser.first_name || targetUser.username} eliminado permanentemente`);
+      onDeleted();
+      onClose();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Error al eliminar usuario');
+    } finally { setDeleting(false); }
+  };
+
+  const name = `${targetUser.first_name || ''} ${targetUser.last_name || ''}`.trim() || targetUser.username;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700">
+          <div className="flex items-center gap-2 text-red-600">
+            <Trash2 size={18} />
+            <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">Eliminar usuario</h2>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+        </div>
+
+        <div className="p-6 space-y-5">
+          {/* User identity */}
+          <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg px-4 py-3">
+            <div className="w-9 h-9 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center text-sm font-bold text-red-700 dark:text-red-300 flex-shrink-0">
+              {(targetUser.first_name?.[0] || targetUser.username?.[0] || '?').toUpperCase()}
+            </div>
+            <div>
+              <p className="font-semibold text-slate-800 dark:text-slate-100">{name}</p>
+              <p className="text-xs text-slate-400">@{targetUser.username} · {ROLE_LABELS[targetUser.role] ?? targetUser.role}</p>
+            </div>
+          </div>
+
+          {loadingInfo ? (
+            <p className="text-center py-4 text-slate-400 text-sm">Analizando asignaciones…</p>
+          ) : (
+            <>
+              {/* Assignments summary */}
+              <div className="grid grid-cols-2 gap-2">
+                {info.projects_directed?.length > 0 && (
+                  <div className="col-span-2 flex items-start gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg px-3 py-2">
+                    <AlertTriangle size={15} className="text-red-500 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs font-semibold text-red-700 dark:text-red-400">
+                        Dirige {info.projects_directed.length} proyecto{info.projects_directed.length > 1 ? 's' : ''}
+                      </p>
+                      <p className="text-xs text-red-600 dark:text-red-300">
+                        {info.projects_directed.map((p) => p.name).join(', ')}
+                      </p>
+                      <p className="text-xs text-red-500 mt-0.5 font-medium">Transferencia obligatoria</p>
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900/40 rounded-lg px-3 py-2">
+                  <UserCheck size={14} className="text-indigo-500" />
+                  <div>
+                    <p className="text-xs text-slate-500">Tareas asignadas</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{info.tasks_assigned}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900/40 rounded-lg px-3 py-2">
+                  <Clock size={14} className="text-amber-500" />
+                  <div>
+                    <p className="text-xs text-slate-500">Registros de tiempo</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{info.time_logs}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900/40 rounded-lg px-3 py-2 col-span-2">
+                  <MessageSquare size={14} className="text-emerald-500" />
+                  <div>
+                    <p className="text-xs text-slate-500">Comentarios</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{info.comments}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Transfer-to dropdown */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Transferir asignaciones a{info.transfer_required ? ' *' : ' (opcional)'}
+                </label>
+                <select
+                  value={transferTo}
+                  onChange={(e) => setTransferTo(e.target.value)}
+                  className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 bg-white dark:bg-slate-700 dark:text-slate-100">
+                  <option value="">— {info.transfer_required ? 'Selecciona un usuario (requerido)' : 'Ninguno (eliminar datos)'} —</option>
+                  {transferOptions.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.first_name || u.username} {u.last_name || ''} (@{u.username}) — {ROLE_LABELS[u.role] ?? u.role}
+                    </option>
+                  ))}
+                </select>
+                {!info.transfer_required && !transferTo && (info.tasks_assigned > 0 || info.time_logs > 0 || info.comments > 0) && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
+                    <AlertTriangle size={11} />
+                    Sin transferencia, los registros de tiempo y comentarios se eliminarán permanentemente.
+                  </p>
+                )}
+              </div>
+
+              {/* Final warning */}
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-4 py-3">
+                <p className="text-xs text-red-700 dark:text-red-300 font-medium">
+                  ⚠️ Esta acción es irreversible. El usuario <strong>{name}</strong> será eliminado permanentemente del sistema.
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-2 px-6 py-4 border-t border-slate-100 dark:border-slate-700">
+          <button onClick={onClose} disabled={deleting}
+            className="text-sm text-slate-500 hover:text-slate-700 px-4 py-2 disabled:opacity-50">
+            Cancelar
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={!canDelete || deleting}
+            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+            <Trash2 size={14} />
+            {deleting ? 'Eliminando…' : (transferTo ? 'Transferir y eliminar' : 'Eliminar definitivamente')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── UsersPage ───────────────────────────────────────────────────────────── */
 export default function UsersPage() {
   const { user: me } = useAuthStore();
   const navigate = useNavigate();
@@ -46,6 +203,7 @@ export default function UsersPage() {
   const [showPass, setShowPass]       = useState(false);
   const [confirm, setConfirm]         = useState(null);
   const [resetingId, setResetingId]   = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null); // user to hard-delete
 
   const load = () => {
     const params = {};
@@ -210,7 +368,7 @@ export default function UsersPage() {
                   <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Rol</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Cargo / Área</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Estado</th>
-                  {isAdmin && <th className="px-4 py-3 w-28" />}
+                  {isAdmin && <th className="px-4 py-3 w-36" />}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
@@ -295,6 +453,14 @@ export default function UsersPage() {
                               <KeyRound size={14} />
                             </button>
                           )}
+                          {u.id !== me?.id && (
+                            <button
+                              onClick={() => setDeleteTarget(u)}
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                              title="Eliminar usuario permanentemente">
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     )}
@@ -306,7 +472,7 @@ export default function UsersPage() {
         )}
       </div>
 
-      {/* User modal */}
+      {/* User create/edit modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -397,6 +563,15 @@ export default function UsersPage() {
       )}
 
       {confirm && <ConfirmModal {...confirm} onClose={() => setConfirm(null)} />}
+
+      {deleteTarget && (
+        <DeleteUserModal
+          targetUser={deleteTarget}
+          allUsers={users}
+          onClose={() => setDeleteTarget(null)}
+          onDeleted={load}
+        />
+      )}
     </Layout>
   );
 }

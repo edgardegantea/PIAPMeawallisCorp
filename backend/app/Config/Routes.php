@@ -235,6 +235,8 @@ $routes->group('api/admin', ['filter' => ['auth', 'admin']], function ($routes) 
     $routes->delete('users/(:num)',                 'Api\UsersController::delete/$1');
     $routes->post('users/(:num)/activate',          'Api\UsersController::activate/$1');
     $routes->post('users/(:num)/reset-password',    'Api\UsersController::sendResetEmail/$1');
+    $routes->get('users/(:num)/assignments',        'Api\UsersController::assignments/$1');
+    $routes->delete('users/(:num)/permanent',       'Api\UsersController::destroy/$1');
     // Permissions panel
     $routes->get('teams',                           'Api\MembersController::allTeams');
 });

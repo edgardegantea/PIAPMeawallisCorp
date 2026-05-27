@@ -174,6 +174,193 @@ class UsersController extends BaseController
         return $this->response->setStatusCode(204)->setBody('');
     }
 
+    /**
+     * GET /api/admin/users/{id}/assignments
+     * Retorna un resumen de lo que tiene asignado el usuario
+     * para mostrar en el modal de confirmación antes de eliminar.
+     */
+    public function assignments(int $id): ResponseInterface
+    {
+        if ($id === Auth::id()) {
+            return $this->response->setStatusCode(422)
+                ->setJSON(['message' => 'No puedes eliminarte a ti mismo']);
+        }
+
+        $user = $this->model->find($id);
+        if (!$user) {
+            return $this->response->setStatusCode(404)->setJSON(['message' => 'Usuario no encontrado']);
+        }
+
+        $db = Database::connect();
+
+        $projectsDirected = $db->query(
+            'SELECT id, name, code, status FROM projects WHERE director_id = ? ORDER BY name',
+            [$id]
+        )->getResultArray();
+
+        $tasksAssigned = (int) $db->query(
+            'SELECT COUNT(*) AS cnt FROM task_assignees WHERE user_id = ?',
+            [$id]
+        )->getRow()->cnt;
+
+        $timeLogs = (int) $db->query(
+            'SELECT COUNT(*) AS cnt FROM task_time_logs WHERE user_id = ?',
+            [$id]
+        )->getRow()->cnt;
+
+        $comments = (int) $db->query(
+            'SELECT COUNT(*) AS cnt FROM task_comments WHERE user_id = ?',
+            [$id]
+        )->getRow()->cnt;
+
+        return $this->response->setJSON([
+            'user'              => UserModel::castRow($user),
+            'projects_directed' => $projectsDirected,   // RESTRICT → obligatorio transferir
+            'tasks_assigned'    => $tasksAssigned,       // CASCADE si no se transfieren
+            'time_logs'         => $timeLogs,            // CASCADE → se pierden
+            'comments'          => $comments,            // CASCADE → se pierden
+            // Requiere transferencia obligatoria si dirige proyectos
+            'transfer_required' => !empty($projectsDirected),
+        ]);
+    }
+
+    /**
+     * DELETE /api/admin/users/{id}/permanent
+     * Elimina definitivamente el usuario.
+     * Body: { "transfer_to": <userId> | null }
+     *
+     * Orden de operaciones:
+     *  1. Transferir projects.director_id    (RESTRICT → obligatorio si existe)
+     *  2. Reasignar task_assignees           (opcional; si no, CASCADE los borra)
+     *  3. DELETE users → DB cascade limpia el resto
+     */
+    public function destroy(int $id): ResponseInterface
+    {
+        if ($id === Auth::id()) {
+            return $this->response->setStatusCode(422)
+                ->setJSON(['message' => 'No puedes eliminarte a ti mismo']);
+        }
+
+        $user = $this->model->find($id);
+        if (!$user) {
+            return $this->response->setStatusCode(404)->setJSON(['message' => 'Usuario no encontrado']);
+        }
+
+        $data       = $this->request->getJSON(true) ?? [];
+        $transferTo = (isset($data['transfer_to']) && is_numeric($data['transfer_to']))
+            ? (int) $data['transfer_to']
+            : null;
+
+        $db = Database::connect();
+
+        // Verificar que el usuario receptor existe
+        if ($transferTo !== null) {
+            if ($transferTo === $id) {
+                return $this->response->setStatusCode(422)
+                    ->setJSON(['message' => 'El usuario de transferencia no puede ser el mismo a eliminar']);
+            }
+            if (!$this->model->find($transferTo)) {
+                return $this->response->setStatusCode(422)
+                    ->setJSON(['message' => 'Usuario de transferencia no encontrado']);
+            }
+        }
+
+        // Si dirige proyectos, la transferencia es obligatoria (FK RESTRICT)
+        $directsProjects = (bool) $db->query(
+            'SELECT COUNT(*) AS cnt FROM projects WHERE director_id = ?', [$id]
+        )->getRow()->cnt;
+
+        if ($directsProjects && $transferTo === null) {
+            return $this->response->setStatusCode(422)
+                ->setJSON(['message' => 'El usuario dirige proyectos. Debes elegir a quién transferirlos antes de eliminar.']);
+        }
+
+        try {
+            $db->transStart();
+
+            if ($transferTo !== null) {
+                // 1. Transferir dirección de proyectos
+                $db->query(
+                    'UPDATE projects SET director_id = ? WHERE director_id = ?',
+                    [$transferTo, $id]
+                );
+
+                // 2. Reasignar task_assignees:
+                //    a) Eliminar los que ya están asignados a transfer_to (evita duplicado)
+                $db->query(
+                    'DELETE FROM task_assignees
+                     WHERE user_id = ?
+                       AND task_id IN (
+                           SELECT task_id FROM (
+                               SELECT task_id FROM task_assignees WHERE user_id = ?
+                           ) AS already_assigned
+                       )',
+                    [$id, $transferTo]
+                );
+                //    b) Reasignar el resto
+                $db->query(
+                    'UPDATE task_assignees SET user_id = ? WHERE user_id = ?',
+                    [$transferTo, $id]
+                );
+
+                // 3. Actualizar tasks.assigned_to (campo de legado, primer asignado)
+                $db->query(
+                    'UPDATE tasks SET assigned_to = ? WHERE assigned_to = ?',
+                    [$transferTo, $id]
+                );
+
+                // 4. Transferir incidentes asignados
+                $db->query(
+                    'UPDATE incidents SET assigned_to = ? WHERE assigned_to = ?',
+                    [$transferTo, $id]
+                );
+
+                // 5. Reasignar PM membership si no existe ya
+                // (el miembro eliminado será quitado por CASCADE, pero si era PM
+                //  y transfer_to no es miembro, agregar como miembro)
+                $pmProjects = $db->query(
+                    'SELECT project_id FROM project_members WHERE user_id = ? AND role = ?',
+                    [$id, 'PM']
+                )->getResultArray();
+                foreach ($pmProjects as $pm) {
+                    $alreadyMember = (bool) $db->query(
+                        'SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ?',
+                        [$pm['project_id'], $transferTo]
+                    )->getRow();
+                    if (!$alreadyMember) {
+                        $db->query(
+                            'INSERT INTO project_members (project_id, user_id, role) VALUES (?, ?, ?)',
+                            [$pm['project_id'], $transferTo, 'PM']
+                        );
+                    }
+                }
+            } else {
+                // Sin transferencia: solo nullificar director (ya verificamos que no hay proyectos)
+                $db->query(
+                    'UPDATE projects SET director_id = NULL WHERE director_id = ?', [$id]
+                );
+            }
+
+            // Eliminar el usuario — el resto lo maneja CASCADE:
+            //   task_assignees, task_time_logs, task_comments, project_members,
+            //   user_favorites, refresh_tokens → CASCADE
+            //   tasks.assigned_to, incidents.assigned_to, risks.owner_id → SET NULL
+            $db->query('DELETE FROM users WHERE id = ?', [$id]);
+
+            $db->transComplete();
+
+            if ($db->transStatus() === false) {
+                throw new \RuntimeException('Transacción fallida');
+            }
+
+            return $this->response->setStatusCode(204)->setBody('');
+        } catch (\Throwable $e) {
+            log_message('error', '[UsersController::destroy] ' . $e->getMessage());
+            return $this->response->setStatusCode(500)
+                ->setJSON(['message' => 'Error al eliminar el usuario: ' . $e->getMessage()]);
+        }
+    }
+
     /** POST /api/admin/users/{id}/activate */
     public function activate(int $id): ResponseInterface
     {

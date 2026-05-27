@@ -83,8 +83,10 @@ export const projectsAPI = {
   adminCreateUser:   (d)     => api.post('/admin/users', d),
   adminUpdateUser:   (id, d) => api.patch(`/admin/users/${id}`, d),
   adminDeleteUser:   (id)    => api.delete(`/admin/users/${id}`),
-  adminActivateUser:     (id)    => api.post(`/admin/users/${id}/activate`),
-  adminResetUserPassword:(id)    => api.post(`/admin/users/${id}/reset-password`),
+  adminActivateUser:        (id)      => api.post(`/admin/users/${id}/activate`),
+  adminResetUserPassword:   (id)      => api.post(`/admin/users/${id}/reset-password`),
+  adminGetUserAssignments:  (id)      => api.get(`/admin/users/${id}/assignments`),
+  adminHardDeleteUser:      (id, data) => api.delete(`/admin/users/${id}/permanent`, { data }),
   adminGetTeams:     ()      => api.get('/admin/teams'),
 
   // Task Checklists
