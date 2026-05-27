@@ -41,6 +41,9 @@ $routes->group('api/profile', ['filter' => 'auth'], function ($routes) {
 // API protegida
 $routes->group('api', ['filter' => 'auth'], function ($routes) {
 
+    // Dashboard personal
+    $routes->get('dashboard', 'Api\DashboardController::index');
+
     // Proyectos
     $routes->get('projects',                     'Api\ProjectsController::index');
     $routes->get('projects/statistics',          'Api\ProjectsController::statistics');

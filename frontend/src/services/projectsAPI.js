@@ -145,6 +145,9 @@ export const projectsAPI = {
   // Calendario
   getCalendar: (year, month) => api.get('/calendar', { params: { year, month } }),
 
+  // Dashboard personal
+  getDashboard: () => api.get('/dashboard'),
+
   // Notificaciones
   getNotifications: () => api.get('/notifications'),
 

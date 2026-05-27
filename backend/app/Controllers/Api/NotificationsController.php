@@ -43,13 +43,16 @@ class NotificationsController extends BaseController
             ];
         }
 
-        // 2. Tareas vencidas asignadas a mí
+        // 2. Tareas vencidas asignadas a mí (soporta multi-asignados)
         $overdueTasks = $db->query("
             SELECT t.id, t.title, t.due_date, s.project_id, p.name as project_name
             FROM tasks t
             JOIN sprints s ON s.id = t.sprint_id
             JOIN projects p ON p.id = s.project_id
-            WHERE t.assigned_to = ?
+            WHERE EXISTS (
+                SELECT 1 FROM task_assignees ta
+                WHERE ta.task_id = t.id AND ta.user_id = ?
+            )
               AND t.due_date < ?
               AND t.status != 'COMPLETADA'
             LIMIT 10

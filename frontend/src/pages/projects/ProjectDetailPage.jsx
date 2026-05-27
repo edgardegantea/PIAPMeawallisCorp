@@ -30,6 +30,7 @@ import EpicsList from '../../components/projects/EpicsList';
 import ImpedimentLog from '../../components/projects/ImpedimentLog';
 import DefinitionOfDone from '../../components/projects/DefinitionOfDone';
 import SprintCeremonies from '../../components/projects/SprintCeremonies';
+import SprintMetrics from '../../components/projects/SprintMetrics';
 
 // ─── Static data ──────────────────────────────────────────────────────────────
 
@@ -73,6 +74,7 @@ const ALL_TABS = [
   { id: 'backlog',       label: 'Backlog',       icon: ListChecks,    managerOnly: false, group: 'scrum'      },
   { id: 'planning',      label: 'Planificación', icon: Layers,        managerOnly: true,  group: 'scrum'      },
   { id: 'kanban',        label: 'Kanban',        icon: ListChecks,    managerOnly: false, group: 'scrum'      },
+  { id: 'metrics',       label: 'Métricas',      icon: TrendingUp,    managerOnly: false, group: 'control'    },
   { id: 'milestones',    label: 'Hitos',         icon: Flag,          managerOnly: false, group: 'control'    },
   { id: 'timeline',      label: 'Tiempo',        icon: Calendar,      managerOnly: true,  group: 'control'    },
   { id: 'risks',         label: 'Riesgos',       icon: AlertTriangle, managerOnly: true,  group: 'control'    },
@@ -366,6 +368,7 @@ export default function ProjectDetailPage() {
             {tab === 'planning'      && <SprintPlanningView  projectId={id} />}
             {tab === 'kanban'        && <KanbanBoard         projectId={id} isManager={isManager} />}
             {tab === 'timeline'      && <GanttView           projectId={id} project={project} />}
+            {tab === 'metrics'       && <SprintMetrics         projectId={id} />}
             {tab === 'milestones'    && <MilestoneList        projectId={id} isManager={isManager} />}
             {tab === 'workload'      && <WorkloadView         projectId={id} />}
             {tab === 'risks'         && <RiskList             projectId={id} isManager={isManager} />}
