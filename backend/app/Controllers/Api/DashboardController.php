@@ -41,7 +41,8 @@ class DashboardController extends BaseController
             AND t.status != 'COMPLETADA'
             ORDER BY
               CASE t.priority WHEN 'CRITICA' THEN 1 WHEN 'ALTA' THEN 2 WHEN 'MEDIA' THEN 3 ELSE 4 END,
-              t.due_date ASC NULLS LAST,
+              ISNULL(t.due_date) ASC,
+              t.due_date ASC,
               t.id ASC
         ", [$userId])->getResultArray();
 
