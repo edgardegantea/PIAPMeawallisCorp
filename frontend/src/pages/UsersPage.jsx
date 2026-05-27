@@ -6,8 +6,8 @@ import Layout from '../components/Layout';
 import ConfirmModal from '../components/ConfirmModal';
 import { toast } from 'sonner';
 import {
-  Plus, Search, Edit2, UserX, UserCheck, X, Save,
-  Eye, EyeOff, Shield, Mail, Users, KeyRound,
+  Plus, Search, Edit2, X, Save,
+  Eye, EyeOff, Shield, KeyRound,
 } from 'lucide-react';
 
 const ROLES = ['ADMIN', 'DIRECTOR', 'PM', 'TEAM_MEMBER'];
@@ -236,46 +236,59 @@ export default function UsersPage() {
                       <p className="text-xs text-slate-700 dark:text-slate-200">{u.position || '—'}</p>
                       {u.department && <p className="text-xs text-slate-400">{u.department}</p>}
                     </td>
+                    {/* Estado — admin: toggle switch clicable; resto: badge estático */}
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center gap-1 text-xs font-medium ${u.is_active ? 'text-emerald-600' : 'text-slate-400'}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${u.is_active ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                        {u.is_active ? 'Activo' : 'Inactivo'}
-                      </span>
+                      {isAdmin && u.id !== me?.id ? (
+                        <button
+                          onClick={() => setConfirm({
+                            title:        u.is_active ? 'Desactivar usuario' : 'Activar usuario',
+                            body:         u.is_active
+                              ? `${u.first_name || u.username} quedará bloqueado y no podrá iniciar sesión.`
+                              : `${u.first_name || u.username} podrá volver a iniciar sesión.`,
+                            variant:      u.is_active ? 'danger' : 'success',
+                            confirmLabel: u.is_active ? 'Desactivar' : 'Activar',
+                            onConfirm:    () => toggleActive(u),
+                          })}
+                          className="group flex items-center gap-2 cursor-pointer select-none"
+                          title={u.is_active ? 'Clic para desactivar' : 'Clic para activar'}>
+                          {/* Toggle pill */}
+                          <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200
+                            ${u.is_active ? 'bg-emerald-500 group-hover:bg-emerald-600' : 'bg-slate-300 dark:bg-slate-600 group-hover:bg-slate-400'}`}>
+                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform duration-200
+                              ${u.is_active ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                          </span>
+                          <span className={`text-xs font-medium ${u.is_active ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-400'}`}>
+                            {u.is_active ? 'Activo' : 'Inactivo'}
+                          </span>
+                        </button>
+                      ) : (
+                        <span className={`inline-flex items-center gap-1 text-xs font-medium ${u.is_active ? 'text-emerald-600' : 'text-slate-400'}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${u.is_active ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                          {u.is_active ? 'Activo' : 'Inactivo'}
+                        </span>
+                      )}
                     </td>
                     {isAdmin && (
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1 justify-end">
                           <button onClick={() => openEdit(u)}
-                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors"
                             title="Editar usuario">
                             <Edit2 size={14} />
                           </button>
                           {u.email && (
                             <button
                               onClick={() => setConfirm({
-                                title: 'Enviar enlace de recuperación',
-                                body: `¿Enviar un enlace de restablecimiento de contraseña a ${u.email}?`,
-                                danger: false,
-                                confirmLabel: 'Enviar',
-                                onConfirm: () => sendReset(u),
+                                title:        'Enviar enlace de recuperación',
+                                body:         `Se enviará un enlace de restablecimiento de contraseña a ${u.email}.`,
+                                variant:      'info',
+                                confirmLabel: 'Enviar enlace',
+                                onConfirm:    () => sendReset(u),
                               })}
                               disabled={resetingId === u.id}
-                              className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors disabled:opacity-40"
+                              className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded transition-colors disabled:opacity-40"
                               title="Enviar enlace de recuperación de contraseña">
                               <KeyRound size={14} />
-                            </button>
-                          )}
-                          {u.id !== me?.id && (
-                            <button
-                              onClick={() => setConfirm({
-                                title: u.is_active ? 'Desactivar usuario' : 'Activar usuario',
-                                body: `¿${u.is_active ? 'Desactivar' : 'Activar'} a ${u.first_name || u.username}?`,
-                                danger: u.is_active,
-                                onConfirm: () => toggleActive(u),
-                              })}
-                              className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
-                              title={u.is_active ? 'Desactivar' : 'Activar'}>
-                              {u.is_active ? <UserX size={14} /> : <UserCheck size={14} />}
                             </button>
                           )}
                         </div>
