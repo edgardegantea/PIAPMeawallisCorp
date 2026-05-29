@@ -262,8 +262,9 @@ $routes->group('api', ['filter' => 'auth'], function ($routes) {
     $routes->put('sprints/(:num)/retro',  'Api\SprintRetrospectiveController::update/$1');
 });
 
-// Descarga de adjuntos — pública (nombres de archivo aleatorios = capability URL)
-$routes->get('api/attachments/(:num)/download', 'Api\TaskAttachmentsController::download/$1');
+// Descargas públicas — capability URLs (nombre aleatorio = seguridad suficiente)
+$routes->get('api/attachments/(:num)/download',    'Api\TaskAttachmentsController::download/$1');
+$routes->get('api/technicaldocs/(:num)/download',  'Api\TechnicalDocsController::download/$1');
 
 // Rutas ADMIN (auth + admin filter)
 $routes->group('api/admin', ['filter' => ['auth', 'admin']], function ($routes) {

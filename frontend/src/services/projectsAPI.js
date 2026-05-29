@@ -140,10 +140,12 @@ export const projectsAPI = {
   deleteContract:  (id)             => api.delete(`/contracts/${id}`),
 
   // Documentación técnica de proyecto
-  getTechnicalDocs:    (projectId)    => api.get(`/projects/${projectId}/technicaldocs`),
-  createTechnicalDoc:  (projectId, d) => api.post(`/projects/${projectId}/technicaldocs`, d),
-  updateTechnicalDoc:  (id, d)        => api.patch(`/technicaldocs/${id}`, d),
-  deleteTechnicalDoc:  (id)           => api.delete(`/technicaldocs/${id}`),
+  getTechnicalDocs:       (projectId)    => api.get(`/projects/${projectId}/technicaldocs`),
+  createTechnicalDoc:     (projectId, d) => api.post(`/projects/${projectId}/technicaldocs`, d),
+  uploadTechnicalDoc:     (projectId, fd)=> api.post(`/projects/${projectId}/technicaldocs`, fd),
+  updateTechnicalDoc:     (id, d)        => api.patch(`/technicaldocs/${id}`, d),
+  deleteTechnicalDoc:     (id)           => api.delete(`/technicaldocs/${id}`),
+  getTechnicalDocDownloadUrl: (id)       => `${api.defaults.baseURL}/technicaldocs/${id}/download`,
 
   // Configuración
   getCompanySettings:    ()  => api.get('/company-settings'),
