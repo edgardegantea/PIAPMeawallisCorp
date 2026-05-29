@@ -130,6 +130,9 @@ export default function ReportsPage() {
     if (period !== 'custom') loadRange(period, '', '');
   }, [period, loadRange]);
 
+  /* PDF export — usa el diálogo de impresión del navegador */
+  const exportPDF = () => window.print();
+
   /* CSV export */
   const exportCSV = () => {
     if (!overview) return;
@@ -343,10 +346,16 @@ export default function ReportsPage() {
             <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">Resumen ejecutivo</h2>
             <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">Métricas globales de la organización</p>
           </div>
-          <button onClick={exportCSV}
-            className="flex items-center gap-2 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm font-medium px-3 py-2 rounded-lg transition-colors flex-shrink-0">
-            <Download size={14} /> Exportar CSV
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0 print:hidden">
+            <button onClick={exportCSV}
+              className="flex items-center gap-2 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm font-medium px-3 py-2 rounded-lg transition-colors">
+              <Download size={14} /> CSV
+            </button>
+            <button onClick={exportPDF}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors">
+              <Download size={14} /> Exportar PDF
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

@@ -163,6 +163,14 @@ $routes->group('api', ['filter' => 'auth'], function ($routes) {
     $routes->patch('timelogs/(:num)',           'Api\TimeLogsController::update/$1');
     $routes->delete('timelogs/(:num)',          'Api\TimeLogsController::delete/$1');
 
+    // Meeting Minutes (Actas de reunión)
+    $routes->get('projects/(:num)/meetings',   'Api\MeetingMinutesController::index/$1');
+    $routes->post('projects/(:num)/meetings',  'Api\MeetingMinutesController::create/$1');
+    $routes->get('meetings/(:num)',            'Api\MeetingMinutesController::show/$1');
+    $routes->patch('meetings/(:num)',          'Api\MeetingMinutesController::update/$1');
+    $routes->put('meetings/(:num)',            'Api\MeetingMinutesController::update/$1');
+    $routes->delete('meetings/(:num)',         'Api\MeetingMinutesController::delete/$1');
+
     // Task Dependencies
     $routes->get('tasks/(:num)/dependencies',    'Api\TaskDependenciesController::index/$1');
     $routes->post('tasks/(:num)/dependencies',   'Api\TaskDependenciesController::create/$1');

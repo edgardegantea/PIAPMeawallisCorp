@@ -13,3 +13,23 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
 .dark ::-webkit-scrollbar-thumb { background: #475569; }
+
+/* ── Print styles (para exportar Reportes como PDF) ── */
+@media print {
+  /* Ocultar navegación lateral y top bar */
+  nav, aside, header,
+  [data-sidebar], [data-topbar],
+  .print\:hidden { display: none !important; }
+
+  /* Quitar sombras y bordes innecesarios */
+  * { box-shadow: none !important; }
+
+  /* Contenido a ancho completo */
+  main, .layout-content { width: 100% !important; margin: 0 !important; padding: 0 !important; }
+
+  /* Evitar cortes de página en tarjetas */
+  .bg-white, .rounded-xl { break-inside: avoid; }
+
+  /* Forzar colores claros */
+  body { background: #fff !important; color: #000 !important; }
+}

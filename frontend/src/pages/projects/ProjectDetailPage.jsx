@@ -9,7 +9,7 @@ import {
   ArrowLeft, Edit, Trash2, Users, AlertTriangle,
   Zap, ListChecks, FileText, BarChart2, Flag,
   CheckCircle2, Clock, TrendingUp, Calendar, Activity, Layers,
-  ScrollText, BookOpen, Milestone, ShieldAlert, CheckSquare, Clapperboard,
+  ScrollText, BookOpen, Milestone, ShieldAlert, CheckSquare, Clapperboard, ClipboardList,
   Tag, ChevronRight, User,
 } from 'lucide-react';
 import SprintList from '../../components/projects/SprintList';
@@ -31,6 +31,7 @@ import ImpedimentLog from '../../components/projects/ImpedimentLog';
 import DefinitionOfDone from '../../components/projects/DefinitionOfDone';
 import SprintCeremonies from '../../components/projects/SprintCeremonies';
 import SprintMetrics from '../../components/projects/SprintMetrics';
+import MeetingMinutes from '../../components/projects/MeetingMinutes';
 
 // ─── Static data ──────────────────────────────────────────────────────────────
 
@@ -88,6 +89,7 @@ const ALL_TABS = [
   { id: 'activity',      label: 'Actividad',     icon: Activity,      managerOnly: false, group: 'people'     },
   { id: 'dod',           label: 'DoD',           icon: CheckSquare,   managerOnly: false, group: 'ceremonies' },
   { id: 'ceremonies',    label: 'Ceremonias',    icon: Clapperboard,  managerOnly: false, group: 'ceremonies' },
+  { id: 'meetings',      label: 'Actas',         icon: ClipboardList, managerOnly: false, group: 'ceremonies' },
 ];
 
 /** Ordered group definitions for the tab bar */
@@ -382,6 +384,7 @@ export default function ProjectDetailPage() {
             {tab === 'impediments'   && <ImpedimentLog        projectId={id} isManager={isManager} />}
             {tab === 'dod'           && <DefinitionOfDone     projectId={id} isManager={isManager} />}
             {tab === 'ceremonies'    && <SprintCeremonies     projectId={id} isManager={isManager} />}
+            {tab === 'meetings'      && <MeetingMinutes       projectId={id} isManager={isManager} />}
           </div>
         </div>
 

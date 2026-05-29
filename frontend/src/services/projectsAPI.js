@@ -163,6 +163,12 @@ export const projectsAPI = {
   getReportRange:      (params) => api.get('/reports/range', { params }),
   getReportProject:    (id)     => api.get(`/reports/project/${id}`),
 
+  // Meeting Minutes (Actas de reunión)
+  getMeetings:    (projectId) => api.get(`/projects/${projectId}/meetings`),
+  createMeeting:  (projectId, d) => api.post(`/projects/${projectId}/meetings`, d),
+  updateMeeting:  (id, d)     => api.patch(`/meetings/${id}`, d),
+  deleteMeeting:  (id)        => api.delete(`/meetings/${id}`),
+
   // Épicas
   getEpics:    (projectId) => api.get('/epics', { params: { project: projectId } }),
   createEpic:  (d)         => api.post('/epics', d),
