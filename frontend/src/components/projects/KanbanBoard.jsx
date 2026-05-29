@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { projectsAPI } from '../../services/projectsAPI';
 import { useAuthStore } from '../../stores/authStore';
 import { toast } from 'sonner';
-import { Plus, Trash2, Flag, Calendar, Clock, GripVertical, Download, User, AlertOctagon, Link2 } from 'lucide-react';
+import { Plus, Trash2, Flag, Calendar, Clock, GripVertical, Download, User, AlertOctagon, Link2, RefreshCw, X } from 'lucide-react';
 import { downloadCSV } from '../../utils/csv';
 import TaskDetailModal from './TaskDetailModal';
 import { useActiveTimer, formatElapsed } from '../../hooks/useTimer';
+import { deadlineInfo } from '../../utils/deadline';
 
 const COLUMNS = [
   { id: 'PENDIENTE',   label: 'Pendiente',   color: 'border-slate-300',  bg: 'bg-slate-50',   header: 'bg-slate-100 text-slate-600',  drop: 'border-slate-400  bg-slate-100'  },
@@ -23,6 +24,77 @@ const PRIORITY_STYLES = {
 
 const PRIORITIES = ['', 'BAJA', 'MEDIA', 'ALTA', 'CRITICA'];
 
+/* ─── ReactivateModal ────────────────────────────────────────────────────── */
+function ReactivateModal({ task, onClose, onReactivated }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [dueDate, setDueDate] = useState(today);
+  const [dueTime, setDueTime] = useState('23:59');
+  const [saving, setSaving]   = useState(false);
+
+  const confirm = async () => {
+    if (!dueDate) { toast.error('Selecciona una fecha'); return; }
+    setSaving(true);
+    try {
+      await projectsAPI.updateTask(task.id, {
+        due_date: dueDate,
+        due_time: dueTime ? `${dueTime}:00` : null,
+        status:   task.status === 'COMPLETADA' ? 'PENDIENTE' : task.status,
+      });
+      toast.success('Tarea reactivada');
+      onReactivated();
+      onClose();
+    } catch { toast.error('Error al reactivar'); }
+    finally { setSaving(false); }
+  };
+
+  const dl = deadlineInfo(task.due_date, task.due_time);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-sm">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-700">
+          <div className="flex items-center gap-2 text-amber-600">
+            <RefreshCw size={16} />
+            <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Reactivar tarea</h2>
+          </div>
+          <button onClick={onClose}><X size={16} className="text-slate-400 hover:text-slate-600" /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <p className="text-xs text-slate-600 dark:text-slate-300 font-medium line-clamp-2">{task.title}</p>
+          {dl?.overdue && (
+            <p className="text-xs text-red-600 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
+              Venció hace {dl.label}. Establece una nueva fecha límite.
+            </p>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Nueva fecha *</label>
+              <input type="date" value={dueDate} min={today}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white dark:bg-slate-700 dark:text-slate-100" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Hora límite</label>
+              <input type="time" value={dueTime}
+                onChange={(e) => setDueTime(e.target.value)}
+                className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white dark:bg-slate-700 dark:text-slate-100" />
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 px-5 py-4 border-t border-slate-100 dark:border-slate-700">
+          <button onClick={onClose} disabled={saving}
+            className="text-sm text-slate-500 hover:text-slate-700 px-4 py-2">Cancelar</button>
+          <button onClick={confirm} disabled={saving || !dueDate}
+            className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+            <RefreshCw size={13} />
+            {saving ? 'Guardando…' : 'Reactivar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function KanbanBoard({ projectId, isManager = true }) {
   const { user }                        = useAuthStore();
   const activeTimer                     = useActiveTimer();
@@ -34,7 +106,8 @@ export default function KanbanBoard({ projectId, isManager = true }) {
   const [showNew, setShowNew]           = useState(null);
   const [priorityFilter, setPriority]   = useState('');
   const [onlyMine, setOnlyMine]         = useState(false);
-  const [selectedTask, setSelectedTask] = useState(null);
+  const [selectedTask, setSelectedTask]       = useState(null);
+  const [reactivateTarget, setReactivateTarget] = useState(null);
 
   // ── Drag & drop state ──────────────────────────────────────
   const [draggingId, setDraggingId]     = useState(null);   // task.id being dragged
@@ -244,7 +317,8 @@ export default function KanbanBoard({ projectId, isManager = true }) {
               <div className="space-y-2 mb-2">
                 {colTasks.map((task) => {
                   const pri           = PRIORITY_STYLES[task.priority];
-                  const isOverdue     = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'COMPLETADA';
+                  const dl            = deadlineInfo(task.due_date, task.due_time);
+                  const isOverdue     = dl?.overdue && task.status !== 'COMPLETADA';
                   const isBeingDragged = String(draggingId) === String(task.id);
                   const timerRunning  = activeTimer?.taskId === task.id;
 
@@ -285,10 +359,18 @@ export default function KanbanBoard({ projectId, isManager = true }) {
                             {pri.label}
                           </span>
                         )}
-                        {task.due_date && (
-                          <span className={`flex items-center gap-0.5 text-xs ${isOverdue ? 'text-red-500 font-medium' : 'text-slate-400'}`}>
-                            <Calendar size={10} />
-                            {task.due_date}
+                        {dl && (
+                          <span className={`flex items-center gap-0.5 text-xs font-medium ${
+                            isOverdue    ? 'text-red-500' :
+                            dl.urgent    ? 'text-amber-500' :
+                            task.status === 'COMPLETADA' ? 'text-emerald-500' : 'text-slate-400'
+                          }`}>
+                            <Clock size={10} />
+                            {isOverdue
+                              ? `Vencida ${dl.label}`
+                              : task.status === 'COMPLETADA'
+                                ? task.due_date
+                                : `Faltan ${dl.label}`}
                           </span>
                         )}
                       </div>
@@ -329,10 +411,17 @@ export default function KanbanBoard({ projectId, isManager = true }) {
                         </div>
                       )}
 
-                      {/* Delete button — shown on hover, stops propagation */}
+                      {/* Manager actions: Reactivar + Delete (shown on hover) */}
                       {isManager && (
-                        <div className="flex justify-end mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                        <div className="flex items-center justify-between mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
                           onClick={(e) => e.stopPropagation()}>
+                          {isOverdue ? (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setReactivateTarget(task); }}
+                              className="flex items-center gap-0.5 text-[10px] font-medium text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 px-1.5 py-0.5 rounded transition-colors">
+                              <RefreshCw size={9} /> Reactivar
+                            </button>
+                          ) : <span />}
                           <button onClick={() => removeTask(task.id)}
                             className="text-red-400 hover:text-red-600 p-0.5 rounded hover:bg-red-50 transition-colors">
                             <Trash2 size={11} />
@@ -380,6 +469,14 @@ export default function KanbanBoard({ projectId, isManager = true }) {
           isManager={isManager}
           onClose={() => setSelectedTask(null)}
           onSaved={() => { loadTasks(sprintId); setSelectedTask(null); }}
+        />
+      )}
+
+      {reactivateTarget && (
+        <ReactivateModal
+          task={reactivateTarget}
+          onClose={() => setReactivateTarget(null)}
+          onReactivated={() => loadTasks(sprintId)}
         />
       )}
     </div>

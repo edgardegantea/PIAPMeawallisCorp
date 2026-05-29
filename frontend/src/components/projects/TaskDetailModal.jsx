@@ -7,8 +7,9 @@ import {
   X, Send, Trash2, Clock, Flag, Calendar, Users, CheckSquare,
   Plus, Tag, AlarmClock, MessageSquare, Save,
   Play, Square, Link2, Link2Off, AlertOctagon, CheckCircle2,
-  ArrowRight, Circle,
+  ArrowRight, Circle, RefreshCw, Timer,
 } from 'lucide-react';
+import { deadlineInfo, formatTime } from '../../utils/deadline';
 
 // ── Constantes ───────────────────────────────────────────────────────────────
 const PRIORITY_STYLES = {
@@ -57,11 +58,76 @@ function TaskStatusChip({ status }) {
   );
 }
 
+// ── DeadlineSection ───────────────────────────────────────────────────────────
+function DeadlineSection({ form, setForm, isManager }) {
+  const dl = deadlineInfo(form.due_date, form.due_time);
+  const isOverdue = dl?.overdue && form.status !== 'COMPLETADA';
+  const isDone    = form.status === 'COMPLETADA';
+
+  return (
+    <div className="space-y-2">
+      {/* Countdown banner */}
+      {dl && !isDone && (
+        <div className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium ${
+          isOverdue   ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800' :
+          dl.urgent   ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800' :
+                        'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+        }`}>
+          <Timer size={13} className="flex-shrink-0" />
+          <span>
+            {isOverdue
+              ? `Vencida hace ${dl.label}`
+              : dl.urgent
+                ? `⚠ Faltan ${dl.label} para el vencimiento`
+                : `Faltan ${dl.label}`}
+          </span>
+        </div>
+      )}
+
+      {/* Date + Time inputs (managers edit; team members read-only) */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="flex items-center gap-1 text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+            <Calendar size={12} /> Fecha límite
+          </label>
+          {isManager ? (
+            <input type="date" value={form.due_date || ''}
+              onChange={(e) => setForm({ ...form, due_date: e.target.value })}
+              className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-700 dark:text-slate-100" />
+          ) : (
+            <p className="text-sm text-slate-700 dark:text-slate-200 px-3 py-2 bg-slate-50 dark:bg-slate-900/30 rounded-lg border border-slate-200 dark:border-slate-700">
+              {form.due_date || '—'}
+            </p>
+          )}
+        </div>
+        <div>
+          <label className="flex items-center gap-1 text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+            <Clock size={12} /> Hora límite
+          </label>
+          {isManager ? (
+            <input type="time" value={form.due_time || ''}
+              onChange={(e) => setForm({ ...form, due_time: e.target.value })}
+              className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-700 dark:text-slate-100" />
+          ) : (
+            <p className="text-sm text-slate-700 dark:text-slate-200 px-3 py-2 bg-slate-50 dark:bg-slate-900/30 rounded-lg border border-slate-200 dark:border-slate-700">
+              {form.due_time ? form.due_time : '23:59 (fin del día)'}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main modal ────────────────────────────────────────────────────────────────
 export default function TaskDetailModal({ task, projectId, isManager = true, onClose, onSaved }) {
   const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState('detalles');
-  const [form, setForm]           = useState({ ...task });
+  const [form, setForm]           = useState({
+    ...task,
+    // due_time de BD es "HH:MM:SS"; <input type="time"> necesita "HH:MM"
+    due_time: task.due_time ? task.due_time.slice(0, 5) : '',
+  });
   const [members, setMembers]     = useState([]);
   const [saving, setSaving]       = useState(false);
 
@@ -196,6 +262,7 @@ export default function TaskDetailModal({ task, projectId, isManager = true, onC
         title: form.title, description: form.description,
         status: form.status, priority: form.priority,
         due_date: form.due_date || null,
+        due_time: form.due_time ? `${form.due_time}:00` : null,
         estimated_hours: form.estimated_hours,
         labels: form.labels || '[]',
       };
@@ -527,8 +594,8 @@ export default function TaskDetailModal({ task, projectId, isManager = true, onC
                 )}
               </div>
 
-              {/* Status / Priority / Due date */}
-              <div className="grid grid-cols-3 gap-3">
+              {/* Status + Priority */}
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Estado</label>
                   <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}
@@ -545,15 +612,10 @@ export default function TaskDetailModal({ task, projectId, isManager = true, onC
                     {Object.entries(PRIORITY_STYLES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="flex items-center gap-1 text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                    <Calendar size={12} /> Fecha límite
-                  </label>
-                  <input type="date" value={form.due_date || ''}
-                    onChange={(e) => setForm({ ...form, due_date: e.target.value })}
-                    className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-700 dark:text-slate-100" />
-                </div>
               </div>
+
+              {/* Fecha + Hora límite con countdown */}
+              <DeadlineSection form={form} setForm={setForm} isManager={isManager} />
 
               {/* Hours */}
               <div className="grid grid-cols-2 gap-3">

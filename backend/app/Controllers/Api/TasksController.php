@@ -239,6 +239,11 @@ class TasksController extends BaseController
             unset($data['assignees']);
         }
 
+        // Solo managers pueden modificar la fecha/hora límite
+        if ($projectId && !ProjectGate::canWrite($projectId)) {
+            unset($data['due_date'], $data['due_time']);
+        }
+
         $this->model->update($id, $data);
 
         if ($assigneeIds !== null) {

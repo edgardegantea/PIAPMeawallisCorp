@@ -13,7 +13,7 @@ class TaskModel extends Model
     protected $allowedFields = [
         'sprint_id', 'backlog_item_id', 'title', 'description',
         'assigned_to', 'status', 'estimated_hours',
-        'priority', 'due_date', 'time_logged', 'labels',
+        'priority', 'due_date', 'due_time', 'time_logged', 'labels',
     ];
     protected $useTimestamps = true;
     protected $createdField  = 'created_at';
