@@ -187,7 +187,6 @@ $routes->group('api', ['filter' => 'auth'], function ($routes) {
     $routes->get('tasks/(:num)/attachments',         'Api\TaskAttachmentsController::index/$1');
     $routes->post('tasks/(:num)/attachments',        'Api\TaskAttachmentsController::upload/$1');
     $routes->delete('attachments/(:num)',            'Api\TaskAttachmentsController::delete/$1');
-    $routes->get('attachments/(:num)/download',      'Api\TaskAttachmentsController::download/$1');
 
     // Comment Reactions
     $routes->get('comments/(:num)/reactions',        'Api\CommentReactionsController::index/$1');
@@ -262,6 +261,9 @@ $routes->group('api', ['filter' => 'auth'], function ($routes) {
     $routes->get('sprints/(:num)/retro',  'Api\SprintRetrospectiveController::show/$1');
     $routes->put('sprints/(:num)/retro',  'Api\SprintRetrospectiveController::update/$1');
 });
+
+// Descarga de adjuntos — pública (nombres de archivo aleatorios = capability URL)
+$routes->get('api/attachments/(:num)/download', 'Api\TaskAttachmentsController::download/$1');
 
 // Rutas ADMIN (auth + admin filter)
 $routes->group('api/admin', ['filter' => ['auth', 'admin']], function ($routes) {
