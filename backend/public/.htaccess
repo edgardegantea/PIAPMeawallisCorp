@@ -47,3 +47,25 @@ Options -Indexes
 # Disable server signature start
 ServerSignature Off
 # Disable server signature end
+
+# ----------------------------------------------------------------------
+# PHP upload limits (for file attachments)
+# ----------------------------------------------------------------------
+<IfModule mod_php.c>
+    php_value upload_max_filesize 20M
+    php_value post_max_size       25M
+    php_value max_execution_time  120
+    php_value max_input_time      120
+</IfModule>
+<IfModule mod_php7.c>
+    php_value upload_max_filesize 20M
+    php_value post_max_size       25M
+    php_value max_execution_time  120
+    php_value max_input_time      120
+</IfModule>
+<IfModule mod_php8.c>
+    php_value upload_max_filesize 20M
+    php_value post_max_size       25M
+    php_value max_execution_time  120
+    php_value max_input_time      120
+</IfModule>
