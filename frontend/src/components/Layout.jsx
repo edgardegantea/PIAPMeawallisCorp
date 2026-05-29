@@ -52,12 +52,21 @@ export default function Layout({ children }) {
   const getAlertKey = (n) => `${n.type}:${n.body}`;
   const unreadCount = notifications.filter((n) => !dismissedKeys.includes(getAlertKey(n))).length;
 
-  const [searchQ, setSearchQ]           = useState('');
-  const [searchResults, setSearchResults] = useState(null);
-  const [searchOpen, setSearchOpen]     = useState(false);
-  const [searching, setSearching]       = useState(false);
+  const [searchQ, setSearchQ]               = useState('');
+  const [searchResults, setSearchResults]   = useState(null);
+  const [searchOpen, setSearchOpen]         = useState(false);
+  const [searching, setSearching]           = useState(false);
+  const [searchSelectedIdx, setSearchSelectedIdx] = useState(-1);
   const searchRef      = useRef(null);
   const searchInputRef = useRef(null);
+
+  // Flat ordered list for keyboard navigation
+  const SEARCH_CATS = ['projects', 'tasks', 'milestones', 'users'];
+  const flatResults = searchResults
+    ? SEARCH_CATS.flatMap((cat) =>
+        (searchResults[cat] || []).map((item) => ({ cat, item }))
+      )
+    : [];
 
   const isMac  = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
   const isAdmin      = user?.role === 'ADMIN';
@@ -100,11 +109,11 @@ export default function Layout({ children }) {
 
   // Debounced search
   useEffect(() => {
-    if (searchQ.length < 2) { setSearchResults(null); setSearchOpen(false); return; }
+    if (searchQ.length < 2) { setSearchResults(null); setSearchOpen(false); setSearchSelectedIdx(-1); return; }
     const t = setTimeout(() => {
       setSearching(true);
       projectsAPI.search(searchQ)
-        .then((r) => { setSearchResults(r.data); setSearchOpen(true); })
+        .then((r) => { setSearchResults(r.data); setSearchOpen(true); setSearchSelectedIdx(-1); })
         .catch(() => {})
         .finally(() => setSearching(false));
     }, 300);
@@ -112,8 +121,28 @@ export default function Layout({ children }) {
   }, [searchQ]);
 
   const handleSearchSelect = (path) => {
-    setSearchQ(''); setSearchOpen(false); setSearchResults(null);
+    setSearchQ(''); setSearchOpen(false); setSearchResults(null); setSearchSelectedIdx(-1);
     navigate(path);
+  };
+
+  const getResultPath = ({ cat, item }) => {
+    if (cat === 'projects')   return `/projects/${item.id}`;
+    if (cat === 'users')      return `/users`;
+    return `/projects/${item.project_id}`;
+  };
+
+  const handleSearchKeyDown = (e) => {
+    if (!searchOpen || flatResults.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSearchSelectedIdx((i) => (i + 1) % flatResults.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSearchSelectedIdx((i) => (i <= 0 ? flatResults.length - 1 : i - 1));
+    } else if (e.key === 'Enter' && searchSelectedIdx >= 0) {
+      e.preventDefault();
+      handleSearchSelect(getResultPath(flatResults[searchSelectedIdx]));
+    }
   };
 
   const handleLogout = () => { logout(); navigate('/'); };
@@ -270,6 +299,7 @@ export default function Layout({ children }) {
               value={searchQ}
               onChange={(e) => setSearchQ(e.target.value)}
               onFocus={() => searchResults && setSearchOpen(true)}
+              onKeyDown={handleSearchKeyDown}
               placeholder={`Buscar… ${isMac ? '⌘K' : 'Ctrl+K'}`}
               className="w-full pl-9 pr-4 py-1.5 text-sm border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-slate-50 dark:bg-slate-700 dark:text-slate-100 dark:placeholder-slate-400"
             />
@@ -278,36 +308,64 @@ export default function Layout({ children }) {
             )}
             {searchOpen && searchResults && (
               <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 z-50 overflow-hidden">
-                {['projects', 'tasks', 'milestones'].map((cat) => {
-                  const items = searchResults[cat] || [];
-                  if (!items.length) return null;
-                  const catLabel = cat === 'projects' ? 'Proyectos' : cat === 'tasks' ? 'Tareas' : 'Hitos';
-                  return (
-                    <div key={cat}>
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide px-4 pt-3 pb-1">{catLabel}</p>
-                      {items.map((item) => {
-                        const path = cat === 'projects'
-                          ? `/projects/${item.id}`
-                          : `/projects/${item.project_id}`;
-                        return (
-                          <button key={item.id} onClick={() => handleSearchSelect(path)}
-                            className="w-full text-left flex items-center gap-3 px-4 py-2.5 hover:bg-indigo-50 dark:hover:bg-slate-700 transition-colors">
-                            {cat === 'projects'   && <FolderKanban size={14} className="text-indigo-500 flex-shrink-0" />}
-                            {cat === 'tasks'      && <CheckSquare  size={14} className="text-emerald-500 flex-shrink-0" />}
-                            {cat === 'milestones' && <Flag         size={14} className="text-purple-500 flex-shrink-0" />}
-                            <div className="min-w-0">
-                              <p className="text-sm text-slate-700 dark:text-slate-200 truncate font-medium">{item.name || item.title}</p>
-                              {item.project_name && <p className="text-xs text-slate-400 truncate">{item.project_name}</p>}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-                {['projects', 'tasks', 'milestones'].every((c) => !(searchResults[c] || []).length) && (
-                  <p className="text-sm text-slate-400 text-center py-6">Sin resultados para "{searchQ}"</p>
-                )}
+                {(() => {
+                  const CAT_META = {
+                    projects:   { label: 'Proyectos', icon: <FolderKanban size={14} className="text-indigo-500 flex-shrink-0" /> },
+                    tasks:      { label: 'Tareas',    icon: <CheckSquare  size={14} className="text-emerald-500 flex-shrink-0" /> },
+                    milestones: { label: 'Hitos',     icon: <Flag         size={14} className="text-purple-500 flex-shrink-0" /> },
+                    users:      { label: 'Usuarios',  icon: <User         size={14} className="text-rose-400 flex-shrink-0" /> },
+                  };
+                  let globalIdx = 0;
+                  const sections = SEARCH_CATS.map((cat) => {
+                    const items = searchResults[cat] || [];
+                    if (!items.length) return null;
+                    const { label, icon } = CAT_META[cat];
+                    return (
+                      <div key={cat}>
+                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide px-4 pt-3 pb-1">{label}</p>
+                        {items.map((item) => {
+                          const idx = globalIdx++;
+                          const isSelected = idx === searchSelectedIdx;
+                          const path = cat === 'projects' ? `/projects/${item.id}`
+                                     : cat === 'users'    ? `/users`
+                                     : `/projects/${item.project_id}`;
+                          const subtitle = cat === 'users'
+                            ? (item.position || item.role?.replace('_', ' '))
+                            : (item.project_name || item.project_code || null);
+                          return (
+                            <button key={item.id} onClick={() => handleSearchSelect(path)}
+                              className={[
+                                'w-full text-left flex items-center gap-3 px-4 py-2.5 transition-colors',
+                                isSelected
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/40'
+                                  : 'hover:bg-slate-50 dark:hover:bg-slate-700',
+                              ].join(' ')}>
+                              {icon}
+                              <div className="min-w-0">
+                                <p className="text-sm text-slate-700 dark:text-slate-200 truncate font-medium">
+                                  {cat === 'users'
+                                    ? `${item.first_name || ''} ${item.last_name || ''}`.trim() || item.username
+                                    : (item.name || item.title)}
+                                </p>
+                                {subtitle && <p className="text-xs text-slate-400 truncate">{subtitle}</p>}
+                              </div>
+                              {isSelected && <ChevronRight size={12} className="ml-auto text-indigo-400 flex-shrink-0" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  });
+                  if (flatResults.length === 0) {
+                    return <p className="text-sm text-slate-400 text-center py-6">Sin resultados para "{searchQ}"</p>;
+                  }
+                  return sections;
+                })()}
+                <div className="border-t border-slate-100 dark:border-slate-700 px-4 py-2 flex items-center gap-3">
+                  <span className="text-xs text-slate-400">↑↓ navegar</span>
+                  <span className="text-xs text-slate-400">↵ abrir</span>
+                  <span className="text-xs text-slate-400">Esc cerrar</span>
+                </div>
               </div>
             )}
           </div>

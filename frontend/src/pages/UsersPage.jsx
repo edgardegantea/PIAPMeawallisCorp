@@ -191,11 +191,23 @@ export default function UsersPage() {
     if (me?.role === 'TEAM_MEMBER') navigate('/dashboard', { replace: true });
   }, [me]);
 
+  // Load persisted filters
+  const loadUF = (key, fallback) => {
+    try { const v = JSON.parse(localStorage.getItem('user_filters') || '{}'); return v[key] ?? fallback; }
+    catch { return fallback; }
+  };
+
   const [users, setUsers]             = useState([]);
-  const [search, setSearch]           = useState('');
-  const [roleFilter, setRoleFilter]   = useState('');
-  const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'active' | 'inactive'
+  const [search, setSearch]           = useState(() => loadUF('search', ''));
+  const [roleFilter, setRoleFilter]   = useState(() => loadUF('roleFilter', ''));
+  const [statusFilter, setStatusFilter] = useState(() => loadUF('statusFilter', 'all')); // 'all' | 'active' | 'inactive'
   const [loading, setLoading]         = useState(true);
+
+  // Persist filters
+  useEffect(() => {
+    try { localStorage.setItem('user_filters', JSON.stringify({ search, roleFilter, statusFilter })); }
+    catch { /* ignore */ }
+  }, [search, roleFilter, statusFilter]);
   const [showModal, setShowModal]     = useState(false);
   const [editing, setEditing]         = useState(null);
   const [form, setForm]               = useState(EMPTY_FORM);

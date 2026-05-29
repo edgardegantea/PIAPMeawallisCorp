@@ -319,4 +319,92 @@ HTML;
             $body
         );
     }
+
+    // ─── Recordatorio de tareas próximas a vencer ─────────────────────────────
+
+    /**
+     * Envía un recordatorio al usuario con la lista de sus tareas que vencen pronto.
+     *
+     * @param array  $user      ['first_name', 'last_name', 'email', 'username']
+     * @param array  $tasks     Array de tareas: [title, due_date, due_time, project_name, project_code]
+     * @param int    $hours     Umbral de horas (para el asunto del correo)
+     */
+    public static function sendTaskReminder(array $user, array $tasks, int $hours = 24): bool
+    {
+        $name     = trim("{$user['first_name']} {$user['last_name']}") ?: ($user['username'] ?? 'Usuario');
+        $count    = count($tasks);
+        $subject  = "⏰ Tienes {$count} tarea" . ($count > 1 ? 's' : '') . " por vencer - PIAP";
+
+        $tasksHtml = '';
+        foreach ($tasks as $t) {
+            $deadline = !empty($t['due_time'])
+                ? htmlspecialchars("{$t['due_date']} a las " . substr($t['due_time'], 0, 5))
+                : htmlspecialchars("el {$t['due_date']}");
+            $title   = htmlspecialchars($t['title'] ?? '');
+            $project = htmlspecialchars("[{$t['project_code']}] {$t['project_name']}");
+            $tasksHtml .= <<<ROW
+            <tr>
+              <td style="padding:10px 0;border-bottom:1px solid #f1f5f9">
+                <p style="margin:0 0 2px 0;font-size:14px;font-weight:600;color:#1e293b">{$title}</p>
+                <p style="margin:0;font-size:12px;color:#64748b">{$project} · Vence {$deadline}</p>
+              </td>
+            </tr>
+ROW;
+        }
+
+        $frontendUrl = rtrim((string)(env('APP_FRONTEND_URL') ?? 'https://piap.maewalliscorp.org'), '/');
+
+        $body = <<<HTML
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:32px 16px">
+    <tr><td align="center">
+      <table width="100%" style="max-width:520px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 8px rgba(0,0,0,.08)">
+
+        <!-- Header -->
+        <tr><td style="background:linear-gradient(135deg,#f59e0b,#d97706);padding:28px 40px;text-align:center">
+          <p style="margin:0;font-size:28px">⏰</p>
+          <h1 style="margin:8px 0 0;font-size:22px;font-weight:700;color:#ffffff">Recordatorio de tareas</h1>
+          <p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,.85)">Tienes tareas que vencen en las próximas {$hours} horas</p>
+        </td></tr>
+
+        <!-- Body -->
+        <tr><td style="padding:32px 40px">
+          <p style="margin:0 0 20px;font-size:15px;color:#334155">Hola, <strong>{$name}</strong>:</p>
+          <p style="margin:0 0 16px;font-size:14px;color:#64748b;line-height:1.6">
+            Las siguientes tareas están próximas a su fecha límite. Asegúrate de actualizarlas o completarlas a tiempo.
+          </p>
+
+          <table width="100%" cellpadding="0" cellspacing="0">
+            {$tasksHtml}
+          </table>
+
+          <table cellpadding="0" cellspacing="0" style="margin-top:28px">
+            <tr><td style="background:#f59e0b;border-radius:8px;padding:0">
+              <a href="{$frontendUrl}/my-tasks"
+                style="display:inline-block;padding:13px 28px;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;border-radius:8px">
+                Ver mis tareas →
+              </a>
+            </td></tr>
+          </table>
+
+          <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0">
+          <p style="margin:0;font-size:12px;color:#94a3b8">Este es un correo automático generado por PIAP. No respondas a este mensaje.</p>
+        </td></tr>
+
+        <tr><td style="background:#f8fafc;padding:16px 40px;text-align:center;border-top:1px solid #e2e8f0">
+          <p style="margin:0;font-size:11px;color:#94a3b8">2026 MaeWallisCorp — Plataforma Integral de Administración de Proyectos</p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+HTML;
+
+        return self::send($user['email'], $subject, $body);
+    }
 }

@@ -187,18 +187,31 @@ export default function ProjectsListPage() {
   const authUser = useAuthStore((s) => s.user);
   const canCreate = authUser?.role !== 'TEAM_MEMBER';
 
+  // Load persisted filters from localStorage (lazy initializers)
+  const loadFilter = (key, fallback) => {
+    try { const v = JSON.parse(localStorage.getItem('project_filters') || '{}'); return v[key] ?? fallback; }
+    catch { return fallback; }
+  };
+
   const [projects,    setProjects]    = useState([]);
   const [categories,  setCategories]  = useState([]);
   const [loading,     setLoading]     = useState(true);
-  const [search,      setSearch]      = useState('');
-  const [status,      setStatus]      = useState('');
-  const [category,    setCategory]    = useState('');
-  const [priority,    setPriority]    = useState('');
+  const [search,      setSearch]      = useState(() => loadFilter('search', ''));
+  const [status,      setStatus]      = useState(() => loadFilter('status', ''));
+  const [category,    setCategory]    = useState(() => loadFilter('category', ''));
+  const [priority,    setPriority]    = useState(() => loadFilter('priority', ''));
   const [showFilters, setShowFilters] = useState(false);
   const [favorites,   setFavorites]   = useState(new Set());
-  const [onlyFavs,    setOnlyFavs]    = useState(false);
-  const [onlyMine,    setOnlyMine]    = useState(false);
+  const [onlyFavs,    setOnlyFavs]    = useState(() => loadFilter('onlyFavs', false));
+  const [onlyMine,    setOnlyMine]    = useState(() => loadFilter('onlyMine', false));
   const [myProjects,  setMyProjects]  = useState([]);
+
+  // Persist filters whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('project_filters', JSON.stringify({ search, status, category, priority, onlyFavs, onlyMine }));
+    } catch { /* ignore */ }
+  }, [search, status, category, priority, onlyFavs, onlyMine]);
 
   useEffect(() => {
     projectsAPI.getCategories().then((r) => setCategories(r.data)).catch(() => {});

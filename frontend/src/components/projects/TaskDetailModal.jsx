@@ -168,6 +168,19 @@ export default function TaskDetailModal({ task, projectId, isManager = true, onC
   const [newComment, setNewComment]   = useState('');
   const [loadingCmt, setLoadingCmt]   = useState(true);
 
+  // @mention picker
+  const [mentionQuery,  setMentionQuery]  = useState('');
+  const [mentionOpen,   setMentionOpen]   = useState(false);
+  const [mentionIdx,    setMentionIdx]    = useState(0);
+  const [mentionStart,  setMentionStart]  = useState(-1);
+  const commentRef = useRef(null);
+
+  const mentionCandidates = members.filter((m) => {
+    if (!mentionQuery) return true;
+    const haystack = `${m.first_name || ''} ${m.last_name || ''} ${m.username || ''}`.toLowerCase();
+    return haystack.includes(mentionQuery.toLowerCase());
+  }).slice(0, 6);
+
   // Labels
   const parseLabels = () => {
     try { return JSON.parse(form.labels || '[]') || []; }
@@ -403,6 +416,7 @@ export default function TaskDetailModal({ task, projectId, isManager = true, onC
       const r = await projectsAPI.createTaskComment(task.id, { body });
       setComments((c) => [...c, r.data]);
       setNewComment('');
+      setMentionOpen(false);
     } catch { toast.error('Error al publicar'); }
   };
   const deleteComment = async (id) => {
@@ -411,6 +425,52 @@ export default function TaskDetailModal({ task, projectId, isManager = true, onC
       setComments((c) => c.filter((cm) => cm.id !== id));
     } catch { toast.error('Error al eliminar'); }
   };
+
+  // Handle textarea input for @mention detection
+  const handleCommentChange = (e) => {
+    const val    = e.target.value;
+    const cursor = e.target.selectionStart;
+    setNewComment(val);
+    const textBefore = val.slice(0, cursor);
+    const atIdx      = textBefore.lastIndexOf('@');
+    if (atIdx !== -1) {
+      const query = textBefore.slice(atIdx + 1);
+      if (!query.includes(' ') && query.length <= 20) {
+        setMentionStart(atIdx);
+        setMentionQuery(query);
+        setMentionOpen(true);
+        setMentionIdx(0);
+        return;
+      }
+    }
+    setMentionOpen(false);
+  };
+
+  // Insert selected @mention into the textarea
+  const insertMention = (member) => {
+    const uname  = member.username || `${member.first_name || ''}${member.last_name || ''}`.toLowerCase();
+    const before  = newComment.slice(0, mentionStart);
+    const after   = newComment.slice(mentionStart + 1 + mentionQuery.length);
+    const updated = `${before}@${uname} ${after}`;
+    setNewComment(updated);
+    setMentionOpen(false);
+    setMentionQuery('');
+    setTimeout(() => {
+      if (commentRef.current) {
+        const pos = mentionStart + uname.length + 2;
+        commentRef.current.focus();
+        commentRef.current.setSelectionRange(pos, pos);
+      }
+    }, 0);
+  };
+
+  // Render comment body, highlighting @mentions in blue
+  const renderCommentBody = (body) =>
+    body.split(/(@\w+)/g).map((part, i) =>
+      /^@\w+$/.test(part)
+        ? <span key={i} className="text-indigo-500 dark:text-indigo-400 font-medium">{part}</span>
+        : part
+    );
 
   const totalLogged = timeLogs.reduce((s, l) => s + parseFloat(l.hours || 0), 0);
   const pri = PRIORITY_STYLES[form.priority] || PRIORITY_STYLES.MEDIA;
@@ -1071,16 +1131,59 @@ export default function TaskDetailModal({ task, projectId, isManager = true, onC
                             )}
                           </div>
                         </div>
-                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 whitespace-pre-line">{c.body}</p>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 whitespace-pre-line">{renderCommentBody(c.body)}</p>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
-              <div className="flex gap-2">
-                <textarea value={newComment} onChange={(e) => setNewComment(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); postComment(); } }}
-                  placeholder="Escribe un comentario… (Enter para enviar)"
+              <div className="relative flex gap-2">
+                {/* @mention dropdown */}
+                {mentionOpen && mentionCandidates.length > 0 && (
+                  <div className="absolute bottom-full left-0 mb-1 w-56 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-20 overflow-hidden">
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide px-3 py-1.5 border-b border-slate-100 dark:border-slate-700">
+                      Mencionar usuario
+                    </p>
+                    {mentionCandidates.map((m, i) => {
+                      const name    = `${m.first_name || ''} ${m.last_name || ''}`.trim() || m.username;
+                      const uname   = m.username;
+                      const isActive = i === mentionIdx;
+                      return (
+                        <button key={m.user_id || m.id}
+                          onMouseDown={(e) => { e.preventDefault(); insertMention(m); }}
+                          className={[
+                            'w-full text-left flex items-center gap-2 px-3 py-2 transition-colors',
+                            isActive ? 'bg-indigo-50 dark:bg-indigo-900/40' : 'hover:bg-slate-50 dark:hover:bg-slate-700',
+                          ].join(' ')}>
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>
+                            {(m.first_name?.[0] || '?').toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate">{name}</p>
+                            <p className="text-[10px] text-slate-400 truncate">@{uname}</p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                    <p className="text-[10px] text-slate-400 px-3 py-1 border-t border-slate-100 dark:border-slate-700">
+                      ↑↓ navegar · ↵ insertar · Esc cerrar
+                    </p>
+                  </div>
+                )}
+                <textarea
+                  ref={commentRef}
+                  value={newComment}
+                  onChange={handleCommentChange}
+                  onKeyDown={(e) => {
+                    if (mentionOpen && mentionCandidates.length > 0) {
+                      if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIdx((i) => (i + 1) % mentionCandidates.length); return; }
+                      if (e.key === 'ArrowUp')   { e.preventDefault(); setMentionIdx((i) => (i - 1 + mentionCandidates.length) % mentionCandidates.length); return; }
+                      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); insertMention(mentionCandidates[mentionIdx]); return; }
+                      if (e.key === 'Escape') { setMentionOpen(false); return; }
+                    }
+                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); postComment(); }
+                  }}
+                  placeholder="Escribe un comentario… (Enter para enviar, @ para mencionar)"
                   rows={2}
                   className="flex-1 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none bg-white dark:bg-slate-700 dark:text-slate-100" />
                 <button onClick={postComment} disabled={!newComment.trim()}
