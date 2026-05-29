@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useThemeStore } from '../stores/themeStore';
 import { projectsAPI } from '../services/projectsAPI';
 import { useActiveTimer, formatElapsed } from '../hooks/useTimer';
+import { toast } from 'sonner';
 import {
   LayoutDashboard, FolderKanban, Tag, User, LogOut,
   Menu, X, ChevronRight, BarChart2, Building2, Shield, Lock,
@@ -43,7 +44,9 @@ export default function Layout({ children }) {
   const [notifOpen, setNotifOpen]         = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [notifCount, setNotifCount]       = useState(0);
-  const notifRef = useRef(null);
+  const [bellRinging, setBellRinging]     = useState(false);
+  const notifRef        = useRef(null);
+  const prevAlertKeys   = useRef(null); // null = first load (no comparison yet)
 
   // Dismissed alert keys (sessionStorage — resets on tab close)
   const [dismissedKeys, setDismissedKeys] = useState(() => {
@@ -75,15 +78,48 @@ export default function Layout({ children }) {
   // Close mobile sidebar on route change
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
-  // Load notifications
-  useEffect(() => {
+  // ── Notification polling ────────────────────────────────────────────────────
+  const loadNotifications = useCallback(() => {
     projectsAPI.getNotifications()
       .then((r) => {
-        setNotifications(r.data.alerts || []);
+        const newAlerts = r.data.alerts || [];
+
+        // Compare against last poll to detect truly new alerts
+        if (prevAlertKeys.current !== null) {
+          const incoming = newAlerts.filter((n) => !prevAlertKeys.current.has(getAlertKey(n)));
+          if (incoming.length > 0) {
+            // Animate bell
+            setBellRinging(true);
+            setTimeout(() => setBellRinging(false), 1800);
+
+            // Sonner toasts for new alerts (max 3)
+            incoming.slice(0, 3).forEach((n) => {
+              const toastFn = n.severity === 'error' ? toast.error : toast.warning;
+              toastFn(n.title, { description: n.body, duration: 6000 });
+            });
+
+            // Native browser notifications (if permission already granted)
+            if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+              incoming.slice(0, 2).forEach((n) => {
+                try { new Notification(n.title, { body: n.body, icon: '/favicon.ico' }); } catch { /* */ }
+              });
+            }
+          }
+        }
+
+        prevAlertKeys.current = new Set(newAlerts.map(getAlertKey));
+        setNotifications(newAlerts);
         setNotifCount(r.data.count || 0);
       })
       .catch(() => {});
-  }, [location.pathname]);
+  }, []);
+
+  // Initial load + poll every 30 s
+  useEffect(() => {
+    loadNotifications();
+    const id = setInterval(loadNotifications, 30_000);
+    return () => clearInterval(id);
+  }, [loadNotifications]);
 
   // Outside click + Ctrl/Cmd+K
   useEffect(() => {
@@ -385,6 +421,7 @@ export default function Layout({ children }) {
             <div className="relative" ref={notifRef}>
               <button onClick={() => {
                   setNotifOpen(!notifOpen);
+                  setBellRinging(false);
                   // Opening the panel marks all current alerts as seen
                   if (!notifOpen && notifications.length > 0) {
                     const keys = notifications.map(getAlertKey);
@@ -392,10 +429,23 @@ export default function Layout({ children }) {
                     try { sessionStorage.setItem('notif_dismissed', JSON.stringify(keys)); } catch { /* */ }
                   }
                 }}
-                className="relative p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
+                className={[
+                  'relative p-2 rounded-lg transition-all',
+                  bellRinging
+                    ? 'text-amber-500 bg-amber-50 dark:bg-amber-900/20 animate-bounce'
+                    : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700',
+                ].join(' ')}>
                 <Bell size={17} />
                 {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold leading-none">
+                  <span className={[
+                    'absolute top-1 right-1 w-4 h-4 text-white text-xs rounded-full flex items-center justify-center font-bold leading-none',
+                    bellRinging ? 'bg-amber-500 animate-ping' : 'bg-red-500',
+                  ].join(' ')}>
+                    {bellRinging ? '' : (unreadCount > 9 ? '9+' : unreadCount)}
+                  </span>
+                )}
+                {unreadCount > 0 && bellRinging && (
+                  <span className="absolute top-1 right-1 w-4 h-4 bg-amber-500 text-white text-xs rounded-full flex items-center justify-center font-bold leading-none">
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
@@ -405,11 +455,19 @@ export default function Layout({ children }) {
                 <div className="absolute right-0 top-full mt-1 w-80 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 z-50 overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-700">
                     <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Notificaciones</span>
-                    {notifCount > 0 && (
-                      <span className="text-xs bg-red-100 text-red-700 font-medium px-2 py-0.5 rounded-full">
-                        {notifCount} alerta{notifCount !== 1 ? 's' : ''}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {notifCount > 0 && (
+                        <span className="text-xs bg-red-100 text-red-700 font-medium px-2 py-0.5 rounded-full">
+                          {notifCount} alerta{notifCount !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); loadNotifications(); }}
+                        title="Actualizar ahora"
+                        className="p-1 text-slate-400 hover:text-indigo-500 transition-colors rounded">
+                        <Bell size={13} />
+                      </button>
+                    </div>
                   </div>
                   <div className="max-h-72 overflow-y-auto">
                     {notifications.length === 0 ? (
@@ -434,6 +492,20 @@ export default function Layout({ children }) {
                         );
                       })
                     )}
+                  </div>
+                  {/* Browser notification opt-in */}
+                  {typeof Notification !== 'undefined' && Notification.permission === 'default' && (
+                    <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-700 bg-indigo-50 dark:bg-indigo-900/20">
+                      <button
+                        onClick={() => Notification.requestPermission().then(() => setNotifOpen(false))}
+                        className="w-full text-xs text-indigo-700 dark:text-indigo-300 font-medium flex items-center justify-center gap-1.5 hover:text-indigo-900 dark:hover:text-indigo-100 transition-colors">
+                        <Bell size={11} /> Activar notificaciones del navegador
+                      </button>
+                    </div>
+                  )}
+                  {/* Auto-refresh hint */}
+                  <div className="px-4 py-1.5 border-t border-slate-100 dark:border-slate-700">
+                    <p className="text-[10px] text-slate-400 text-center">Se actualiza automáticamente cada 30 seg</p>
                   </div>
                 </div>
               )}
