@@ -203,7 +203,7 @@ export const projectsAPI = {
   getAttachments:    (taskId)      => api.get(`/tasks/${taskId}/attachments`),
   uploadAttachment:  (taskId, fd)  => api.post(`/tasks/${taskId}/attachments`, fd, { headers: { 'Content-Type': 'multipart/form-data' } }),
   deleteAttachment:  (id)          => api.delete(`/attachments/${id}`),
-  getAttachmentDownloadUrl: (id)   => `${api.defaults.baseURL}/attachments/${id}/download`,
+  downloadAttachment: (id) => api.get(`/attachments/${id}/download`, { responseType: 'blob' }),
 
   // Comment Reactions
   getReactions:   (commentId)        => api.get(`/comments/${commentId}/reactions`),

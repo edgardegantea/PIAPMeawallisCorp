@@ -1003,12 +1003,20 @@ export default function TaskDetailModal({ task, projectId, isManager = true, onC
                           <span> · {new Date(att.created_at).toLocaleDateString('es')}</span>
                         </p>
                       </div>
-                      <a href={projectsAPI.getAttachmentDownloadUrl(att.id)}
-                        target="_blank" rel="noreferrer"
+                      <button
+                        onClick={async () => {
+                          try {
+                            const res = await projectsAPI.downloadAttachment(att.id);
+                            const url = URL.createObjectURL(new Blob([res.data], { type: res.headers['content-type'] }));
+                            const a = document.createElement('a');
+                            a.href = url; a.download = att.original_name; a.click();
+                            setTimeout(() => URL.revokeObjectURL(url), 10000);
+                          } catch { toast.error('Error al descargar el archivo'); }
+                        }}
                         className="flex-shrink-0 p-1.5 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors"
                         title="Descargar">
                         <Download size={14} />
-                      </a>
+                      </button>
                       <button onClick={() => deleteAttachment(att.id)}
                         className="flex-shrink-0 p-1.5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all rounded"
                         title="Eliminar">
