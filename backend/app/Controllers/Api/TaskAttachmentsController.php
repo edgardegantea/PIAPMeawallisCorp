@@ -19,12 +19,16 @@ class TaskAttachmentsController extends BaseController
 {
     private const UPLOAD_DIR  = WRITEPATH . 'uploads/tasks/';
     private const MAX_SIZE_MB = 10;
-    private const ALLOWED     = ['image/jpeg','image/png','image/gif','image/webp',
-                                  'application/pdf','text/plain',
-                                  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                                  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                                  'application/msword','application/vnd.ms-excel',
-                                  'application/zip'];
+    private const ALLOWED     = [
+        'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+        'application/pdf',
+        'text/plain', 'text/csv',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'application/msword', 'application/vnd.ms-excel', 'application/vnd.ms-powerpoint',
+        'application/zip', 'application/x-zip-compressed', 'application/octet-stream',
+    ];
 
     public function index(int $taskId): ResponseInterface
     {
@@ -44,20 +48,47 @@ class TaskAttachmentsController extends BaseController
     {
         $file = $this->request->getFile('file');
 
-        if (!$file || !$file->isValid()) {
-            return $this->response->setStatusCode(422)->setJSON(['message' => 'Archivo requerido']);
+        // No field found at all
+        if (!$file) {
+            return $this->response->setStatusCode(422)
+                ->setJSON(['message' => 'Campo "file" no encontrado en la solicitud']);
+        }
+
+        // PHP rejected the upload (size limit, no tmp dir, etc.)
+        if (!$file->isValid()) {
+            $phpErr = $file->getError();
+            $errMap = [
+                UPLOAD_ERR_INI_SIZE   => 'El archivo supera upload_max_filesize del servidor (ajusta php.ini en Plesk)',
+                UPLOAD_ERR_FORM_SIZE  => 'El archivo supera el límite del formulario',
+                UPLOAD_ERR_PARTIAL    => 'El archivo se subió de forma parcial, intenta de nuevo',
+                UPLOAD_ERR_NO_FILE    => 'No se seleccionó ningún archivo',
+                UPLOAD_ERR_NO_TMP_DIR => 'El servidor no tiene directorio temporal configurado',
+                UPLOAD_ERR_CANT_WRITE => 'El servidor no pudo escribir el archivo en disco',
+                UPLOAD_ERR_EXTENSION  => 'Una extensión de PHP bloqueó la subida',
+            ];
+            $msg = $errMap[$phpErr] ?? ('Error PHP al subir el archivo (código ' . $phpErr . ')');
+            return $this->response->setStatusCode(422)->setJSON(['message' => $msg]);
         }
 
         if ($file->getSizeByUnit('mb') > self::MAX_SIZE_MB) {
-            return $this->response->setStatusCode(422)->setJSON(['message' => "El archivo no puede superar " . self::MAX_SIZE_MB . " MB"]);
+            return $this->response->setStatusCode(422)
+                ->setJSON(['message' => 'El archivo no puede superar ' . self::MAX_SIZE_MB . ' MB']);
         }
 
         if (!in_array($file->getMimeType(), self::ALLOWED)) {
-            return $this->response->setStatusCode(422)->setJSON(['message' => 'Tipo de archivo no permitido']);
+            return $this->response->setStatusCode(422)
+                ->setJSON(['message' => 'Tipo de archivo no permitido: ' . $file->getMimeType()]);
         }
 
         $dir = self::UPLOAD_DIR . $taskId . '/';
-        if (!is_dir($dir)) { mkdir($dir, 0755, true); }
+        if (!is_dir($dir) && !mkdir($dir, 0775, true)) {
+            return $this->response->setStatusCode(500)
+                ->setJSON(['message' => 'No se pudo crear el directorio de uploads: ' . $dir]);
+        }
+        if (!is_writable($dir)) {
+            return $this->response->setStatusCode(500)
+                ->setJSON(['message' => 'El directorio de uploads no tiene permisos de escritura: ' . $dir]);
+        }
 
         $stored = $file->getRandomName();
         $file->move($dir, $stored);
