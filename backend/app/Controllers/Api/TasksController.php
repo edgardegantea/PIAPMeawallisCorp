@@ -4,6 +4,7 @@ namespace App\Controllers\Api;
 
 use App\Controllers\BaseController;
 use App\Libraries\ActivityLogger;
+use App\Libraries\AuditLog;
 use App\Libraries\Auth;
 use App\Libraries\ProjectGate;
 use App\Models\TaskCommentModel;
@@ -266,6 +267,18 @@ class TasksController extends BaseController
                     'Estado de tarea cambiado a ' . $data['status'] . ': ' . ($after['title'] ?? '')
                 );
             }
+            AuditLog::record('task', $id, 'status_changed',
+                "Estado cambiado de {$before['status']} a {$data['status']}: {$after['title']}",
+                ['status' => $before['status']],
+                ['status' => $data['status']]
+            );
+        } elseif (!empty(array_diff_key($data, ['assignees' => 1, 'status' => 1]))) {
+            // Log general updates (title, description, priority, due_date, etc.)
+            AuditLog::record('task', $id, 'updated',
+                "Tarea actualizada: {$after['title']}",
+                array_intersect_key($before, $data),
+                array_intersect_key($after,  $data)
+            );
         }
 
         return $this->response->setJSON($after);

@@ -22,6 +22,9 @@ import ProjectDetailPage from './pages/projects/ProjectDetailPage';
 import ProjectFormPage   from './pages/projects/ProjectFormPage';
 import MyTasksPage       from './pages/MyTasksPage';
 import CalendarPage      from './pages/CalendarPage';
+import AuditPage         from './pages/AuditPage';
+import TemplatesPage     from './pages/TemplatesPage';
+import PWAInstallPrompt  from './components/PWAInstallPrompt';
 
 function PrivateRoute({ children }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -40,6 +43,7 @@ export default function App() {
   return (
     <Router>
       <Toaster position="top-right" richColors closeButton />
+      <PWAInstallPrompt />
       <Routes>
         {/* Public */}
         <Route path="/"                 element={<PublicRoute><LoginPage /></PublicRoute>} />
@@ -62,6 +66,9 @@ export default function App() {
         <Route path="/projects/new"      element={<PrivateRoute><ProjectFormPage /></PrivateRoute>} />
         <Route path="/projects/:id"      element={<PrivateRoute><ProjectDetailPage /></PrivateRoute>} />
         <Route path="/projects/:id/edit" element={<PrivateRoute><ProjectFormPage /></PrivateRoute>} />
+
+        <Route path="/templates" element={<PrivateRoute><TemplatesPage /></PrivateRoute>} />
+        <Route path="/audit"     element={<PrivateRoute><AuditPage /></PrivateRoute>} />
 
         {/* 404 */}
         <Route path="*" element={<NotFoundPage />} />

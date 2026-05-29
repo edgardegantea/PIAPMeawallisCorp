@@ -130,6 +130,40 @@ export default function ReportsPage() {
     if (period !== 'custom') loadRange(period, '', '');
   }, [period, loadRange]);
 
+  // ── Time report ─────────────────────────────────────────────────────────
+  const [timeFrom, setTimeFrom]         = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10));
+  const [timeTo, setTimeTo]             = useState(() => new Date().toISOString().slice(0, 10));
+  const [timeProjectId, setTimeProjectId] = useState('');
+  const [timeData, setTimeData]         = useState(null);
+  const [loadingTime, setLoadingTime]   = useState(false);
+  const [projects, setProjects]         = useState([]);
+
+  useEffect(() => {
+    projectsAPI.getProjects().then((r) => setProjects(r.data)).catch(() => {});
+  }, []);
+
+  const loadTimeReport = () => {
+    setLoadingTime(true);
+    projectsAPI.getTimeReport({ from: timeFrom, to: timeTo, project_id: timeProjectId || undefined })
+      .then((r) => setTimeData(r.data))
+      .catch(() => setTimeData(null))
+      .finally(() => setLoadingTime(false));
+  };
+
+  const exportTimeCSV = () => {
+    if (!timeData?.rows) return;
+    const rows = [
+      ['Fecha', 'Horas', 'Proyecto', 'Tarea', 'Usuario', 'Descripción'],
+      ...timeData.rows.map((r) => [r.work_date, r.hours, r.project_name, r.task_title, r.user_name, r.description || '']),
+      [],
+      ['TOTAL', timeData.grand_total, '', '', '', ''],
+    ];
+    const csv = '﻿' + rows.map((r) => r.map((c) => `"${c}"`).join(',')).join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: `timelogs_${timeFrom}_${timeTo}.csv` });
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  };
+
   /* PDF export — usa el diálogo de impresión del navegador */
   const exportPDF = () => window.print();
 
@@ -187,6 +221,119 @@ export default function ReportsPage() {
   return (
     <Layout>
       <div className="p-4 sm:p-6 space-y-6">
+
+        {/* ── SECCIÓN 0: Reporte de tiempo detallado ──────────────── */}
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <Clock size={18} className="text-emerald-500" />
+              <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">Reporte de tiempo</h2>
+              {timeData && (
+                <span className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-2 py-0.5 rounded-full">
+                  {timeData.grand_total}h total
+                </span>
+              )}
+            </div>
+            {timeData && (
+              <button onClick={exportTimeCSV}
+                className="flex items-center gap-1.5 text-xs border border-slate-300 hover:bg-slate-50 text-slate-600 px-3 py-1.5 rounded-lg transition-colors print:hidden">
+                <Download size={12} /> Exportar CSV
+              </button>
+            )}
+          </div>
+
+          {/* Filters */}
+          <div className="flex flex-wrap gap-3 mb-4">
+            <div>
+              <label className="block text-xs text-slate-500 mb-0.5">Desde</label>
+              <input type="date" value={timeFrom} onChange={(e) => setTimeFrom(e.target.value)}
+                className="border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-700 dark:text-slate-100" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-500 mb-0.5">Hasta</label>
+              <input type="date" value={timeTo} onChange={(e) => setTimeTo(e.target.value)}
+                className="border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-700 dark:text-slate-100" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-500 mb-0.5">Proyecto</label>
+              <select value={timeProjectId} onChange={(e) => setTimeProjectId(e.target.value)}
+                className="border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-700 dark:text-slate-100">
+                <option value="">Todos los proyectos</option>
+                {projects.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
+              </select>
+            </div>
+            <div className="flex items-end">
+              <button onClick={loadTimeReport} disabled={loadingTime}
+                className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition-colors">
+                {loadingTime ? 'Cargando…' : 'Generar reporte'}
+              </button>
+            </div>
+          </div>
+
+          {timeData && (
+            <div className="space-y-4">
+              {/* Totals by user */}
+              {timeData.by_user.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Por usuario</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {timeData.by_user.map((u) => (
+                      <div key={u.user_id} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
+                        <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-xs font-bold text-indigo-700 dark:text-indigo-300 flex-shrink-0">
+                          {(u.user_name?.[0] || '?').toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{u.user_name}</p>
+                          <p className="text-xs text-slate-400">{u.entries} registro{u.entries !== 1 ? 's' : ''}</p>
+                        </div>
+                        <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 flex-shrink-0">{parseFloat(u.total_hours).toFixed(1)}h</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Detail table */}
+              <div>
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Detalle ({timeData.rows.length} registros)</p>
+                <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 dark:bg-slate-700/50">
+                      <tr>
+                        {['Fecha','Horas','Proyecto','Tarea','Usuario','Descripción'].map((h) => (
+                          <th key={h} className="px-3 py-2 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {timeData.rows.length === 0 ? (
+                        <tr><td colSpan="6" className="text-center py-8 text-slate-400 text-sm">Sin registros en este período</td></tr>
+                      ) : timeData.rows.map((r) => (
+                        <tr key={r.id} className="border-t border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30">
+                          <td className="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">{r.work_date}</td>
+                          <td className="px-3 py-2 font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">{parseFloat(r.hours).toFixed(1)}h</td>
+                          <td className="px-3 py-2 text-xs"><span className="font-mono text-slate-400">{r.project_code}</span> {r.project_name}</td>
+                          <td className="px-3 py-2 text-xs max-w-[180px] truncate text-slate-700 dark:text-slate-300">{r.task_title}</td>
+                          <td className="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">{r.user_name}</td>
+                          <td className="px-3 py-2 text-xs text-slate-400 max-w-[150px] truncate">{r.description || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    {timeData.grand_total > 0 && (
+                      <tfoot className="bg-slate-50 dark:bg-slate-700/50 border-t-2 border-slate-200 dark:border-slate-700">
+                        <tr>
+                          <td className="px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-200">TOTAL</td>
+                          <td className="px-3 py-2 font-bold text-emerald-600 dark:text-emerald-400">{parseFloat(timeData.grand_total).toFixed(1)}h</td>
+                          <td colSpan="4" />
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* ── SECCIÓN 1: Reporte por período ─────────────────────── */}
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-5">

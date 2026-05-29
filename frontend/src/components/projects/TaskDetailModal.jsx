@@ -7,7 +7,8 @@ import {
   X, Send, Trash2, Clock, Flag, Calendar, Users, CheckSquare,
   Plus, Tag, AlarmClock, MessageSquare, Save,
   Play, Square, Link2, Link2Off, AlertOctagon, CheckCircle2,
-  ArrowRight, Circle, RefreshCw, Timer,
+  ArrowRight, Circle, RefreshCw, Timer, Paperclip, Download,
+  FileText, Image, Archive,
 } from 'lucide-react';
 import { deadlineInfo, formatTime } from '../../utils/deadline';
 
@@ -33,7 +34,9 @@ const LABEL_PALETTE = [
 
 const TABS = [
   { id: 'detalles',      icon: Flag,         label: 'Detalles'     },
+  { id: 'subtareas',     icon: CheckSquare,  label: 'Subtareas'    },
   { id: 'checklist',     icon: CheckSquare,  label: 'Checklist'    },
+  { id: 'adjuntos',      icon: Plus,         label: 'Adjuntos'     },
   { id: 'tiempo',        icon: AlarmClock,   label: 'Tiempo'       },
   { id: 'dependencias',  icon: Link2,        label: 'Deps'         },
   { id: 'comentarios',   icon: MessageSquare,label: 'Comentarios'  },
@@ -168,6 +171,17 @@ export default function TaskDetailModal({ task, projectId, isManager = true, onC
   const [newComment, setNewComment]   = useState('');
   const [loadingCmt, setLoadingCmt]   = useState(true);
 
+  // Subtasks
+  const [subtasks, setSubtasks]       = useState([]);
+  const [newSubtask, setNewSubtask]   = useState('');
+  const [addingSubtask, setAddingSubtask] = useState(false);
+
+  // Attachments
+  const [attachments, setAttachments]       = useState([]);
+  const [uploadingFile, setUploadingFile]   = useState(false);
+  const attachDropRef = useRef(null);
+  const fileInputRef  = useRef(null);
+
   // @mention picker
   const [mentionQuery,  setMentionQuery]  = useState('');
   const [mentionOpen,   setMentionOpen]   = useState(false);
@@ -202,6 +216,12 @@ export default function TaskDetailModal({ task, projectId, isManager = true, onC
 
     projectsAPI.getTimeLogs(task.id)
       .then((r) => setTimeLogs(r.data)).catch(() => {});
+
+    projectsAPI.getSubtasks(task.id)
+      .then((r) => setSubtasks(r.data)).catch(() => {});
+
+    projectsAPI.getAttachments(task.id)
+      .then((r) => setAttachments(r.data)).catch(() => {});
 
     if (projectId) {
       projectsAPI.getMembers(projectId)
@@ -464,6 +484,64 @@ export default function TaskDetailModal({ task, projectId, isManager = true, onC
     }, 0);
   };
 
+  // ── Subtasks ──────────────────────────────────────────────────────────────
+  const addSubtask = async () => {
+    const title = newSubtask.trim();
+    if (!title) return;
+    setAddingSubtask(true);
+    try {
+      const r = await projectsAPI.createSubtask(task.id, { title });
+      setSubtasks((s) => [...s, r.data]);
+      setNewSubtask('');
+    } catch { toast.error('Error al crear subtarea'); }
+    finally { setAddingSubtask(false); }
+  };
+  const toggleSubtask = async (sub) => {
+    const newStatus = sub.status === 'COMPLETADA' ? 'PENDIENTE' : 'COMPLETADA';
+    setSubtasks((s) => s.map((x) => x.id === sub.id ? { ...x, status: newStatus } : x));
+    try { await projectsAPI.updateSubtask(sub.id, { status: newStatus }); }
+    catch { setSubtasks((s) => s.map((x) => x.id === sub.id ? sub : x)); }
+  };
+  const deleteSubtask = async (id) => {
+    setSubtasks((s) => s.filter((x) => x.id !== id));
+    try { await projectsAPI.deleteSubtask(id); }
+    catch { toast.error('Error al eliminar subtarea'); }
+  };
+  const subtaskDone = subtasks.filter((s) => s.status === 'COMPLETADA').length;
+
+  // ── Attachments ────────────────────────────────────────────────────────────
+  const uploadFile = async (file) => {
+    if (!file) return;
+    setUploadingFile(true);
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const r = await projectsAPI.uploadAttachment(task.id, fd);
+      setAttachments((a) => [r.data, ...a]);
+      toast.success('Archivo adjuntado');
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Error al subir archivo');
+    } finally { setUploadingFile(false); }
+  };
+  const deleteAttachment = async (id) => {
+    setAttachments((a) => a.filter((x) => x.id !== id));
+    try { await projectsAPI.deleteAttachment(id); }
+    catch { toast.error('Error al eliminar adjunto'); }
+  };
+  const fileIcon = (mime) => {
+    if (!mime) return <FileText size={14} className="text-slate-400" />;
+    if (mime.startsWith('image/')) return <Image size={14} className="text-indigo-500" />;
+    if (mime === 'application/pdf') return <FileText size={14} className="text-red-500" />;
+    if (mime.includes('zip') || mime.includes('archive')) return <Archive size={14} className="text-amber-500" />;
+    return <FileText size={14} className="text-slate-500" />;
+  };
+  const fmtSize = (bytes) => {
+    if (!bytes) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1048576).toFixed(1)} MB`;
+  };
+
   // Render comment body, highlighting @mentions in blue
   const renderCommentBody = (body) =>
     body.split(/(@\w+)/g).map((part, i) =>
@@ -471,6 +549,25 @@ export default function TaskDetailModal({ task, projectId, isManager = true, onC
         ? <span key={i} className="text-indigo-500 dark:text-indigo-400 font-medium">{part}</span>
         : part
     );
+
+  // ── Reactions ─────────────────────────────────────────────────────────────
+  const EMOJIS = ['👍', '✅', '🚀', '❓', '🔥', '😬'];
+  const [reactionsMap, setReactionsMap] = useState({});  // commentId → [{emoji, count, reacted}]
+
+  const loadReactions = async (commentId) => {
+    if (reactionsMap[commentId]) return;
+    try {
+      const r = await projectsAPI.getReactions(commentId);
+      setReactionsMap((m) => ({ ...m, [commentId]: r.data }));
+    } catch { /* ignore */ }
+  };
+
+  const handleReaction = async (commentId, emoji) => {
+    try {
+      const r = await projectsAPI.toggleReaction(commentId, emoji);
+      setReactionsMap((m) => ({ ...m, [commentId]: r.data.reactions }));
+    } catch { toast.error('Error al reaccionar'); }
+  };
 
   const totalLogged = timeLogs.reduce((s, l) => s + parseFloat(l.hours || 0), 0);
   const pri = PRIORITY_STYLES[form.priority] || PRIORITY_STYLES.MEDIA;
@@ -528,6 +625,16 @@ export default function TaskDetailModal({ task, projectId, isManager = true, onC
                   : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}>
               <Icon size={13} />
               {label}
+              {id === 'subtareas' && subtasks.length > 0 && (
+                <span className="ml-0.5 text-xs bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-1.5 rounded-full">
+                  {subtaskDone}/{subtasks.length}
+                </span>
+              )}
+              {id === 'adjuntos' && attachments.length > 0 && (
+                <span className="ml-0.5 text-xs bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 px-1.5 rounded-full">
+                  {attachments.length}
+                </span>
+              )}
               {id === 'checklist' && checklists.length > 0 && (
                 <span className="ml-0.5 text-xs bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 px-1.5 rounded-full">
                   {doneCount}/{checklists.length}
@@ -798,6 +905,119 @@ export default function TaskDetailModal({ task, projectId, isManager = true, onC
                   <Plus size={13} /> Agregar
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* ── SUBTAREAS ──────────────────────────────────────────── */}
+          {activeTab === 'subtareas' && (
+            <div>
+              {subtasks.length > 0 && (
+                <div className="mb-4">
+                  <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
+                    <span>{subtaskDone} de {subtasks.length} completadas</span>
+                    <span className="font-semibold">{subtasks.length ? Math.round((subtaskDone / subtasks.length) * 100) : 0}%</span>
+                  </div>
+                  <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500 rounded-full transition-all"
+                      style={{ width: `${subtasks.length ? Math.round((subtaskDone / subtasks.length) * 100) : 0}%` }} />
+                  </div>
+                </div>
+              )}
+              <div className="space-y-1.5 mb-4">
+                {subtasks.length === 0 && (
+                  <p className="text-sm text-slate-400 text-center py-6">Sin subtareas. Desglosa esta tarea en pasos más pequeños.</p>
+                )}
+                {subtasks.map((sub) => (
+                  <div key={sub.id} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 group">
+                    <input type="checkbox"
+                      checked={sub.status === 'COMPLETADA'}
+                      onChange={() => toggleSubtask(sub)}
+                      className="w-4 h-4 rounded accent-emerald-600 cursor-pointer flex-shrink-0" />
+                    <span className={`flex-1 text-sm transition-all ${sub.status === 'COMPLETADA' ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                      {sub.title}
+                    </span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                      sub.priority === 'CRITICA' ? 'bg-red-100 text-red-600' :
+                      sub.priority === 'ALTA'    ? 'bg-amber-100 text-amber-600' :
+                      sub.priority === 'MEDIA'   ? 'bg-blue-100 text-blue-600' :
+                      'bg-slate-100 text-slate-500'
+                    }`}>{sub.priority || 'MEDIA'}</span>
+                    {sub.due_date && (
+                      <span className="text-xs text-slate-400">{sub.due_date}</span>
+                    )}
+                    <button onClick={() => deleteSubtask(sub.id)}
+                      className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all p-1">
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              {isManager && (
+                <div className="flex gap-2">
+                  <input value={newSubtask}
+                    onChange={(e) => setNewSubtask(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSubtask(); } }}
+                    placeholder="Nueva subtarea… (Enter para agregar)"
+                    className="flex-1 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-700 dark:text-slate-100" />
+                  <button onClick={addSubtask} disabled={addingSubtask || !newSubtask.trim()}
+                    className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex-shrink-0">
+                    <Plus size={13} /> Agregar
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── ADJUNTOS ───────────────────────────────────────────── */}
+          {activeTab === 'adjuntos' && (
+            <div className="space-y-4">
+              {/* Dropzone */}
+              <div
+                ref={attachDropRef}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => { e.preventDefault(); uploadFile(e.dataTransfer.files[0]); }}
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl p-8 text-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/30 dark:hover:bg-indigo-900/10 transition-all">
+                <Paperclip size={24} className="mx-auto mb-2 text-slate-400" />
+                <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                  {uploadingFile ? 'Subiendo…' : 'Arrastra un archivo o haz clic para seleccionar'}
+                </p>
+                <p className="text-xs text-slate-400 mt-1">PDF, imágenes, Word, Excel, ZIP — máx. 10 MB</p>
+                <input ref={fileInputRef} type="file" className="hidden"
+                  onChange={(e) => uploadFile(e.target.files[0])} />
+              </div>
+
+              {/* File list */}
+              {attachments.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-4">Sin adjuntos aún</p>
+              ) : (
+                <div className="space-y-2">
+                  {attachments.map((att) => (
+                    <div key={att.id} className="flex items-center gap-3 px-4 py-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl group">
+                      <div className="flex-shrink-0">{fileIcon(att.mime_type)}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{att.original_name}</p>
+                        <p className="text-xs text-slate-400">
+                          {fmtSize(att.size_bytes)}
+                          {att.uploader_name && <span> · {att.uploader_name}</span>}
+                          <span> · {new Date(att.created_at).toLocaleDateString('es')}</span>
+                        </p>
+                      </div>
+                      <a href={projectsAPI.getAttachmentDownloadUrl(att.id)}
+                        target="_blank" rel="noreferrer"
+                        className="flex-shrink-0 p-1.5 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors"
+                        title="Descargar">
+                        <Download size={14} />
+                      </a>
+                      <button onClick={() => deleteAttachment(att.id)}
+                        className="flex-shrink-0 p-1.5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all rounded"
+                        title="Eliminar">
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -1132,6 +1352,33 @@ export default function TaskDetailModal({ task, projectId, isManager = true, onC
                           </div>
                         </div>
                         <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 whitespace-pre-line">{renderCommentBody(c.body)}</p>
+                        {/* Reactions */}
+                        <div className="flex items-center gap-1 mt-1.5 flex-wrap"
+                          onMouseEnter={() => loadReactions(c.id)}>
+                          {(reactionsMap[c.id] || []).map((r) => (
+                            <button key={r.emoji}
+                              onClick={() => handleReaction(c.id, r.emoji)}
+                              className={`flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full border transition-colors ${
+                                Number(r.reacted)
+                                  ? 'border-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
+                                  : 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 hover:border-slate-300'
+                              }`}>
+                              {r.emoji} <span className="text-[10px] font-medium">{r.count}</span>
+                            </button>
+                          ))}
+                          {/* Emoji picker trigger */}
+                          <div className="relative group/ep">
+                            <button className="text-xs px-1.5 py-0.5 rounded-full border border-dashed border-slate-200 dark:border-slate-600 text-slate-400 hover:border-slate-400 transition-colors">+</button>
+                            <div className="absolute bottom-full left-0 mb-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg p-1.5 flex gap-1 z-20 opacity-0 pointer-events-none group-hover/ep:opacity-100 group-hover/ep:pointer-events-auto transition-opacity">
+                              {EMOJIS.map((e) => (
+                                <button key={e} onClick={() => handleReaction(c.id, e)}
+                                  className="text-base hover:scale-125 transition-transform w-7 h-7 flex items-center justify-center rounded hover:bg-slate-100 dark:hover:bg-slate-700">
+                                  {e}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))}

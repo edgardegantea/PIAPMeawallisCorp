@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { projectsAPI } from '../../services/projectsAPI';
 import { useAuthStore } from '../../stores/authStore';
 import { toast } from 'sonner';
-import { Plus, Trash2, Flag, Calendar, Clock, GripVertical, Download, User, AlertOctagon, Link2, RefreshCw, X } from 'lucide-react';
+import { Plus, Trash2, Flag, Calendar, Clock, GripVertical, Download, User, AlertOctagon, Link2, RefreshCw, X, LayoutList, LayoutGrid, CheckSquare, Square as SquareIcon, ChevronUp, ChevronDown } from 'lucide-react';
 import { downloadCSV } from '../../utils/csv';
 import TaskDetailModal from './TaskDetailModal';
 import { useActiveTimer, formatElapsed } from '../../hooks/useTimer';
@@ -109,6 +109,13 @@ export default function KanbanBoard({ projectId, isManager = true }) {
   const [selectedTask, setSelectedTask]       = useState(null);
   const [reactivateTarget, setReactivateTarget] = useState(null);
 
+  // ── View mode & bulk selection ─────────────────────────────
+  const [viewMode, setViewMode]         = useState('board'); // 'board' | 'list'
+  const [selectedIds, setSelectedIds]   = useState(new Set());
+  const [sortField, setSortField]       = useState('');
+  const [sortDir, setSortDir]           = useState('asc');
+  const [bulkStatus, setBulkStatus]     = useState('');
+
   // ── Drag & drop state ──────────────────────────────────────
   const [draggingId, setDraggingId]     = useState(null);   // task.id being dragged
   const [dragOverCol, setDragOverCol]   = useState(null);   // column id hovered
@@ -170,6 +177,60 @@ export default function KanbanBoard({ projectId, isManager = true }) {
       setTasks((t) => t.filter((tk) => tk.id !== taskId));
     } catch { toast.error('Error'); }
   };
+
+  // ── Bulk actions ───────────────────────────────────────────
+  const toggleSelect = (id) => setSelectedIds((prev) => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredTasks.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(filteredTasks.map((t) => t.id)));
+  };
+  const clearSelection = () => { setSelectedIds(new Set()); setBulkStatus(''); };
+
+  const bulkChangeStatus = async (status) => {
+    if (!status) return;
+    const ids = [...selectedIds];
+    setTasks((all) => all.map((t) => ids.includes(t.id) ? { ...t, status } : t));
+    try {
+      await Promise.all(ids.map((id) => projectsAPI.updateTask(id, { status })));
+      toast.success(`${ids.length} tarea(s) actualizadas`);
+      clearSelection();
+    } catch { toast.error('Error al actualizar'); loadTasks(sprintId); }
+  };
+
+  const bulkDelete = async () => {
+    if (!window.confirm(`¿Eliminar ${selectedIds.size} tarea(s) seleccionada(s)? Esta acción no se puede deshacer.`)) return;
+    const ids = [...selectedIds];
+    setTasks((all) => all.filter((t) => !ids.includes(t.id)));
+    try {
+      await Promise.all(ids.map((id) => projectsAPI.deleteTask(id)));
+      toast.success(`${ids.length} tarea(s) eliminadas`);
+      clearSelection();
+    } catch { toast.error('Error al eliminar'); loadTasks(sprintId); }
+  };
+
+  // ── Sort for list view ─────────────────────────────────────
+  const sortedTasks = [...filteredTasks].sort((a, b) => {
+    if (!sortField) return 0;
+    let va = a[sortField] ?? '';
+    let vb = b[sortField] ?? '';
+    if (sortField === 'due_date') { va = va || '9999'; vb = vb || '9999'; }
+    const cmp = String(va).localeCompare(String(vb), 'es', { numeric: true });
+    return sortDir === 'asc' ? cmp : -cmp;
+  });
+
+  const SortBtn = ({ field, label }) => (
+    <button onClick={() => { if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField(field); setSortDir('asc'); } }}
+      className="flex items-center gap-1 hover:text-indigo-600 transition-colors">
+      {label}
+      {sortField === field
+        ? (sortDir === 'asc' ? <ChevronUp size={11} /> : <ChevronDown size={11} />)
+        : <span className="w-3" />}
+    </button>
+  );
 
   // ── DnD handlers ──────────────────────────────────────────
 
@@ -255,7 +316,7 @@ export default function KanbanBoard({ projectId, isManager = true }) {
               : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}>
           <User size={13} /> {onlyMine ? 'Mis tareas' : 'Todas'}
         </button>
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-2">
           {filteredTasks.length > 0 && (
             <button onClick={() => downloadCSV(filteredTasks, [
               { key: 'title',               label: 'Título' },
@@ -270,14 +331,177 @@ export default function KanbanBoard({ projectId, isManager = true }) {
               <Download size={12} /> CSV
             </button>
           )}
-          <span className="text-xs text-slate-400">
+          {/* View toggle */}
+          <div className="flex border border-slate-300 rounded-lg overflow-hidden">
+            <button onClick={() => { setViewMode('board'); clearSelection(); }}
+              title="Vista tablero"
+              className={`px-2.5 py-1.5 text-xs flex items-center gap-1 transition-colors ${viewMode === 'board' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
+              <LayoutGrid size={13} />
+            </button>
+            <button onClick={() => setViewMode('list')}
+              title="Vista lista"
+              className={`px-2.5 py-1.5 text-xs flex items-center gap-1 transition-colors ${viewMode === 'list' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
+              <LayoutList size={13} />
+            </button>
+          </div>
+          <span className="text-xs text-slate-400 min-w-max">
             {filteredTasks.length} tarea{filteredTasks.length !== 1 ? 's' : ''}
             {draggingId && <span className="ml-2 text-indigo-400 font-medium animate-pulse">• arrastrando…</span>}
           </span>
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-3">
+      {/* ── Bulk action bar ──────────────────────────────────── */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700 rounded-xl px-4 py-2 mb-4 flex-wrap">
+          <span className="text-sm font-semibold text-indigo-700 dark:text-indigo-300 flex items-center gap-1.5">
+            <CheckSquare size={14} /> {selectedIds.size} seleccionada{selectedIds.size !== 1 ? 's' : ''}
+          </span>
+          <select
+            value={bulkStatus}
+            onChange={(e) => { setBulkStatus(e.target.value); bulkChangeStatus(e.target.value); }}
+            className="border border-indigo-300 dark:border-indigo-600 rounded-lg px-2 py-1 text-sm bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none">
+            <option value="">Cambiar estado…</option>
+            {COLUMNS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+          </select>
+          {isManager && (
+            <button onClick={bulkDelete}
+              className="flex items-center gap-1.5 text-sm text-red-600 hover:text-red-700 font-medium px-3 py-1 rounded-lg border border-red-200 hover:bg-red-50 dark:border-red-700 dark:hover:bg-red-900/20 transition-colors">
+              <Trash2 size={13} /> Eliminar
+            </button>
+          )}
+          <button onClick={clearSelection} className="text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 ml-auto">
+            <X size={13} />
+          </button>
+        </div>
+      )}
+
+      {/* ── LIST VIEW ──────────────────────────────────────── */}
+      {viewMode === 'list' && (
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50">
+                <th className="px-3 py-2.5 w-8">
+                  <input type="checkbox"
+                    checked={selectedIds.size > 0 && selectedIds.size === filteredTasks.length}
+                    ref={(el) => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < filteredTasks.length; }}
+                    onChange={toggleSelectAll}
+                    className="accent-indigo-600" />
+                </th>
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                  <SortBtn field="title" label="Tarea" />
+                </th>
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                  <SortBtn field="status" label="Estado" />
+                </th>
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                  <SortBtn field="priority" label="Prioridad" />
+                </th>
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide hidden md:table-cell">Asignados</th>
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                  <SortBtn field="due_date" label="Vencimiento" />
+                </th>
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide hidden lg:table-cell">Progreso</th>
+                <th className="px-3 py-2.5 w-8" />
+              </tr>
+            </thead>
+            <tbody>
+              {sortedTasks.length === 0 && (
+                <tr><td colSpan="8" className="text-center py-10 text-slate-400 text-sm">Sin tareas para mostrar</td></tr>
+              )}
+              {sortedTasks.map((task) => {
+                const pri       = PRIORITY_STYLES[task.priority];
+                const dl        = deadlineInfo(task.due_date, task.due_time);
+                const isOverdue = dl?.overdue && task.status !== 'COMPLETADA';
+                const STATUS_DOT = { PENDIENTE: 'bg-slate-400', EN_PROGRESO: 'bg-blue-500', BLOQUEADA: 'bg-red-500', COMPLETADA: 'bg-emerald-500' };
+                const STATUS_LABEL = { PENDIENTE: 'Pendiente', EN_PROGRESO: 'En progreso', BLOQUEADA: 'Bloqueada', COMPLETADA: 'Completada' };
+                const checked   = selectedIds.has(task.id);
+                const pct       = task.estimated_hours > 0
+                  ? Math.min(100, Math.round((task.time_logged / task.estimated_hours) * 100))
+                  : null;
+
+                return (
+                  <tr key={task.id}
+                    className={`border-b border-slate-100 dark:border-slate-700/50 last:border-0 transition-colors ${checked ? 'bg-indigo-50 dark:bg-indigo-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-700/30'}`}>
+                    <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                      <input type="checkbox" checked={checked} onChange={() => toggleSelect(task.id)} className="accent-indigo-600" />
+                    </td>
+                    <td className="px-3 py-2.5 max-w-[220px]">
+                      <button onClick={() => setSelectedTask(task)}
+                        className="text-left text-sm font-medium text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 line-clamp-2 transition-colors">
+                        {task.title}
+                      </button>
+                    </td>
+                    <td className="px-3 py-2.5 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1 text-xs">
+                        <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[task.status]}`} />
+                        <span className="text-slate-600 dark:text-slate-400">{STATUS_LABEL[task.status] || task.status}</span>
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 whitespace-nowrap">
+                      {pri && (
+                        <span className={`inline-flex items-center gap-1 text-xs font-medium ${pri.text}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${pri.dot}`} />
+                          {pri.label}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 hidden md:table-cell">
+                      <div className="flex items-center gap-0.5">
+                        {(task.assignees || []).slice(0, 3).map((a, i) => (
+                          <div key={a.user_id} title={`${a.first_name} ${a.last_name}`}
+                            className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold ring-1 ring-white dark:ring-slate-800 -ml-1 first:ml-0"
+                            style={{ background: ['#6366f1','#8b5cf6','#3b82f6','#10b981','#f59e0b'][i % 5] }}>
+                            {(a.first_name?.[0] || '')}{(a.last_name?.[0] || '')}
+                          </div>
+                        ))}
+                        {(task.assignees || []).length > 3 && <span className="text-[10px] text-slate-400 ml-1">+{task.assignees.length - 3}</span>}
+                        {!(task.assignees || []).length && <span className="text-xs text-slate-300">—</span>}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5 whitespace-nowrap">
+                      {dl ? (
+                        <span className={`text-xs font-medium ${isOverdue ? 'text-red-500' : dl.urgent ? 'text-amber-500' : 'text-slate-500 dark:text-slate-400'}`}>
+                          {isOverdue ? `▲ ${dl.label}` : task.status === 'COMPLETADA' ? task.due_date : dl.label}
+                        </span>
+                      ) : <span className="text-slate-300 text-xs">—</span>}
+                    </td>
+                    <td className="px-3 py-2.5 hidden lg:table-cell">
+                      {pct !== null ? (
+                        <div className="flex items-center gap-2 min-w-[80px]">
+                          <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width: `${pct}%`, background: pct > 100 ? '#ef4444' : '#6366f1' }} />
+                          </div>
+                          <span className="text-[10px] text-slate-400">{pct}%</span>
+                        </div>
+                      ) : <span className="text-slate-300 text-xs">—</span>}
+                    </td>
+                    <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                      {isManager && (
+                        <div className="flex items-center gap-1">
+                          {isOverdue && (
+                            <button onClick={() => setReactivateTarget(task)}
+                              title="Reactivar" className="text-amber-500 hover:text-amber-700 p-0.5 rounded transition-colors">
+                              <RefreshCw size={12} />
+                            </button>
+                          )}
+                          <button onClick={() => removeTask(task.id)}
+                            title="Eliminar" className="text-red-400 hover:text-red-600 p-0.5 rounded transition-colors">
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {viewMode === 'board' && <div className="grid grid-cols-4 gap-3">
         {COLUMNS.map((col) => {
           const { id, label, color, bg, header, drop } = col;
           const colTasks  = filteredTasks.filter((t) => t.status === id);
@@ -460,7 +684,7 @@ export default function KanbanBoard({ projectId, isManager = true }) {
             </div>
           );
         })}
-      </div>
+      </div>}
 
       {selectedTask && (
         <TaskDetailModal

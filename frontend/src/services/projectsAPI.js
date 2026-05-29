@@ -192,4 +192,35 @@ export const projectsAPI = {
   // Sprint Retrospectiva
   getSprintRetro:    (sprintId) => api.get(`/sprints/${sprintId}/retro`),
   updateSprintRetro: (sprintId, d) => api.put(`/sprints/${sprintId}/retro`, d),
+
+  // Subtasks
+  getSubtasks:    (taskId)     => api.get(`/tasks/${taskId}/subtasks`),
+  createSubtask:  (taskId, d)  => api.post(`/tasks/${taskId}/subtasks`, d),
+  updateSubtask:  (id, d)      => api.patch(`/subtasks/${id}`, d),
+  deleteSubtask:  (id)         => api.delete(`/subtasks/${id}`),
+
+  // Task Attachments
+  getAttachments:    (taskId)      => api.get(`/tasks/${taskId}/attachments`),
+  uploadAttachment:  (taskId, fd)  => api.post(`/tasks/${taskId}/attachments`, fd, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  deleteAttachment:  (id)          => api.delete(`/attachments/${id}`),
+  getAttachmentDownloadUrl: (id)   => `${api.defaults.baseURL}/attachments/${id}/download`,
+
+  // Comment Reactions
+  getReactions:   (commentId)        => api.get(`/comments/${commentId}/reactions`),
+  toggleReaction: (commentId, emoji) => api.post(`/comments/${commentId}/reactions`, { emoji }),
+
+  // Reports - time detail
+  getTimeReport:  (params) => api.get('/reports/time', { params }),
+
+  // Audit Log
+  getAuditLog:    (params) => api.get('/audit', { params }),
+
+  // Project Templates
+  getTemplates:           ()            => api.get('/templates'),
+  getTemplate:            (id)          => api.get(`/templates/${id}`),
+  createTemplate:         (d)           => api.post('/templates', d),
+  updateTemplate:         (id, d)       => api.patch(`/templates/${id}`, d),
+  deleteTemplate:         (id)          => api.delete(`/templates/${id}`),
+  saveProjectAsTemplate:  (templateId, projectId) => api.post(`/templates/${templateId}/save-from-project`, { project_id: projectId }),
+  createProjectFromTemplate: (templateId, d)      => api.post(`/templates/${templateId}/create-project`, d),
 };

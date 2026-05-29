@@ -145,6 +145,7 @@ $routes->group('api', ['filter' => 'auth'], function ($routes) {
     $routes->get('reports/overview',        'Api\ReportsController::overview');
     $routes->get('reports/range',           'Api\ReportsController::range');
     $routes->get('reports/project/(:num)',  'Api\ReportsController::project/$1');
+    $routes->get('reports/time',            'Api\ReportsController::time');
 
     // Company Settings
     $routes->get('company-settings',    'Api\CompanySettingsController::show');
@@ -175,6 +176,34 @@ $routes->group('api', ['filter' => 'auth'], function ($routes) {
     $routes->get('tasks/(:num)/dependencies',    'Api\TaskDependenciesController::index/$1');
     $routes->post('tasks/(:num)/dependencies',   'Api\TaskDependenciesController::create/$1');
     $routes->delete('dependencies/(:num)',        'Api\TaskDependenciesController::delete/$1');
+
+    // Subtasks
+    $routes->get('tasks/(:num)/subtasks',        'Api\SubtasksController::index/$1');
+    $routes->post('tasks/(:num)/subtasks',       'Api\SubtasksController::create/$1');
+    $routes->patch('subtasks/(:num)',            'Api\SubtasksController::update/$1');
+    $routes->delete('subtasks/(:num)',           'Api\SubtasksController::delete/$1');
+
+    // Task Attachments
+    $routes->get('tasks/(:num)/attachments',         'Api\TaskAttachmentsController::index/$1');
+    $routes->post('tasks/(:num)/attachments',        'Api\TaskAttachmentsController::upload/$1');
+    $routes->delete('attachments/(:num)',            'Api\TaskAttachmentsController::delete/$1');
+    $routes->get('attachments/(:num)/download',      'Api\TaskAttachmentsController::download/$1');
+
+    // Comment Reactions
+    $routes->get('comments/(:num)/reactions',        'Api\CommentReactionsController::index/$1');
+    $routes->post('comments/(:num)/reactions',       'Api\CommentReactionsController::toggle/$1');
+
+    // Audit Log (admin only)
+    $routes->get('audit',                            'Api\AuditController::index');
+
+    // Project Templates
+    $routes->get('templates',                        'Api\ProjectTemplatesController::index');
+    $routes->post('templates',                       'Api\ProjectTemplatesController::create');
+    $routes->get('templates/(:num)',                 'Api\ProjectTemplatesController::show/$1');
+    $routes->patch('templates/(:num)',               'Api\ProjectTemplatesController::update/$1');
+    $routes->delete('templates/(:num)',              'Api\ProjectTemplatesController::delete/$1');
+    $routes->post('templates/(:num)/save-from-project', 'Api\ProjectTemplatesController::saveFromProject/$1');
+    $routes->post('templates/(:num)/create-project',    'Api\ProjectTemplatesController::createProject/$1');
 
     // Activity Log
     $routes->get('projects/(:num)/activity',   'Api\ActivityController::index/$1');

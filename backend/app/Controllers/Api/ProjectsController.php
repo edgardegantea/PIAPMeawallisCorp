@@ -3,6 +3,7 @@
 namespace App\Controllers\Api;
 
 use App\Controllers\BaseController;
+use App\Libraries\AuditLog;
 use App\Libraries\Auth;
 use App\Libraries\ProjectGate;
 use App\Models\ProjectModel;
@@ -95,13 +96,16 @@ class ProjectsController extends BaseController
                 ->setJSON(['message' => 'Error al crear el proyecto']);
         }
 
+        AuditLog::record('project', (int)$id, 'created', "Proyecto creado: {$data['name']} ({$data['code']})");
+
         return $this->response->setStatusCode(201)
             ->setJSON($this->model->findWithRelations($id));
     }
 
     public function update(int $id): ResponseInterface
     {
-        if (! $this->model->find($id)) {
+        $before = $this->model->find($id);
+        if (!$before) {
             return $this->response->setStatusCode(404)
                 ->setJSON(['message' => 'Proyecto no encontrado']);
         }
@@ -112,13 +116,16 @@ class ProjectsController extends BaseController
 
         $data = $this->request->getJSON(true) ?? $this->request->getPost();
         $this->model->update($id, $this->nullifyEmptyIntegers($data));
+        AuditLog::record('project', $id, 'updated', "Proyecto actualizado: {$before['name']}",
+            array_intersect_key($before, $data), $data);
 
         return $this->response->setJSON($this->model->findWithRelations($id));
     }
 
     public function delete(int $id): ResponseInterface
     {
-        if (! $this->model->find($id)) {
+        $before = $this->model->find($id);
+        if (!$before) {
             return $this->response->setStatusCode(404)
                 ->setJSON(['message' => 'Proyecto no encontrado']);
         }
@@ -128,6 +135,7 @@ class ProjectsController extends BaseController
         }
 
         $this->model->update($id, ['is_active' => 0]);
+        AuditLog::record('project', $id, 'deleted', "Proyecto desactivado: {$before['name']}");
         return $this->response->setStatusCode(204)->setBody('');
     }
 

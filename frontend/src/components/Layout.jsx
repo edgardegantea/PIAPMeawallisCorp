@@ -9,7 +9,7 @@ import {
   LayoutDashboard, FolderKanban, Tag, User, LogOut,
   Menu, X, ChevronRight, BarChart2, Building2, Shield, Lock,
   Bell, AlertTriangle, Clock, Flag, Search, CheckSquare,
-  Sun, Moon, ListTodo, CalendarDays, Square,
+  Sun, Moon, ListTodo, CalendarDays, Square, LayoutTemplate, ScrollText,
 } from 'lucide-react';
 
 const SEVERITY_ICON = {
@@ -192,12 +192,14 @@ export default function Layout({ children }) {
       { to: '/reports',   icon: BarChart2,        label: 'Reportes'   },
     ]),
     navSection('Catálogos', [
-      { to: '/categories', icon: Tag, label: 'Categorías' },
+      { to: '/categories', icon: Tag,            label: 'Categorías' },
+      { to: '/templates',  icon: LayoutTemplate, label: 'Plantillas' },
     ]),
     ...(isAdmin ? [navSection('Administración', [
-      { to: '/users',            icon: Shield,    label: 'Usuarios' },
-      { to: '/permissions',      icon: Lock,      label: 'Permisos' },
-      { to: '/company-settings', icon: Building2, label: 'Empresa' },
+      { to: '/users',            icon: Shield,     label: 'Usuarios'   },
+      { to: '/permissions',      icon: Lock,       label: 'Permisos'   },
+      { to: '/company-settings', icon: Building2,  label: 'Empresa'    },
+      { to: '/audit',            icon: ScrollText, label: 'Auditoría'  },
     ])] : isTeamMember ? [] : [navSection('Configuración', [
       { to: '/company-settings', icon: Building2, label: 'Empresa' },
     ])]),

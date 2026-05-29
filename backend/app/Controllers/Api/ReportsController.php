@@ -341,4 +341,97 @@ class ReportsController extends BaseController
             'members_added'     => $membersAdded,
         ]);
     }
+
+    /**
+     * GET /reports/time
+     * Detalle de timelogs por usuario/proyecto con totales.
+     * Params: project_id, user_id, from (YYYY-MM-DD), to (YYYY-MM-DD)
+     */
+    public function time(): ResponseInterface
+    {
+        $db        = Database::connect();
+        $projectId = $this->request->getGet('project_id');
+        $userId    = $this->request->getGet('user_id');
+        $from      = $this->request->getGet('from') ?: date('Y-m-01');
+        $to        = $this->request->getGet('to')   ?: date('Y-m-d');
+
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) {
+            return $this->response->setStatusCode(422)->setJSON(['message' => 'Formato inválido (YYYY-MM-DD)']);
+        }
+
+        $params = [$from, $to];
+        $where  = 'WHERE tl.work_date BETWEEN ? AND ?';
+
+        if ($projectId) { $where .= ' AND s.project_id = ?'; $params[] = (int)$projectId; }
+        if ($userId)    { $where .= ' AND tl.user_id = ?';   $params[] = (int)$userId; }
+
+        // Detailed rows
+        $rows = $db->query("
+            SELECT
+                tl.id,
+                tl.work_date,
+                tl.hours,
+                tl.description,
+                u.id         AS user_id,
+                CONCAT(u.first_name, ' ', u.last_name) AS user_name,
+                u.email,
+                t.id         AS task_id,
+                t.title      AS task_title,
+                t.status     AS task_status,
+                p.id         AS project_id,
+                p.name       AS project_name,
+                p.code       AS project_code
+            FROM time_logs tl
+            JOIN users    u  ON u.id  = tl.user_id
+            JOIN tasks    t  ON t.id  = tl.task_id
+            JOIN sprints  s  ON s.id  = t.sprint_id
+            JOIN projects p  ON p.id  = s.project_id
+            {$where}
+            ORDER BY tl.work_date DESC, tl.id DESC
+        ", $params)->getResultArray();
+
+        // Totals by user
+        $byUser = [];
+        foreach ($rows as $r) {
+            $uid = $r['user_id'];
+            if (!isset($byUser[$uid])) {
+                $byUser[$uid] = [
+                    'user_id'   => $uid,
+                    'user_name' => $r['user_name'],
+                    'email'     => $r['email'],
+                    'total_hours' => 0,
+                    'entries'   => 0,
+                ];
+            }
+            $byUser[$uid]['total_hours'] += (float)$r['hours'];
+            $byUser[$uid]['entries']++;
+        }
+
+        // Totals by project
+        $byProject = [];
+        foreach ($rows as $r) {
+            $pid = $r['project_id'];
+            if (!isset($byProject[$pid])) {
+                $byProject[$pid] = [
+                    'project_id'   => $pid,
+                    'project_name' => $r['project_name'],
+                    'project_code' => $r['project_code'],
+                    'total_hours'  => 0,
+                    'entries'      => 0,
+                ];
+            }
+            $byProject[$pid]['total_hours'] += (float)$r['hours'];
+            $byProject[$pid]['entries']++;
+        }
+
+        $grandTotal = array_sum(array_column($rows, 'hours'));
+
+        return $this->response->setJSON([
+            'period'      => ['from' => $from, 'to' => $to],
+            'grand_total' => round($grandTotal, 2),
+            'rows'        => $rows,
+            'by_user'     => array_values($byUser),
+            'by_project'  => array_values($byProject),
+        ]);
+    }
 }

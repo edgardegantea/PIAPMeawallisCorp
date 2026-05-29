@@ -430,9 +430,15 @@ function ProjectOverview({ project, report, reload, isManager, onTabChange }) {
   const timePct     = totalDays && totalDays > 0 ? Math.min(100, Math.round((elapsed / totalDays) * 100)) : 0;
 
   // Budget
-  const planned  = parseFloat(project.planned_budget ?? 0);
-  const executed = parseFloat(project.actual_budget  ?? 0);
-  const budgetPct = planned > 0 ? Math.min(100, Math.round((executed / planned) * 100)) : 0;
+  const planned      = parseFloat(project.planned_budget ?? 0);
+  const executed     = parseFloat(project.actual_budget  ?? 0);
+  const hourlyRate   = parseFloat(project.hourly_rate    ?? 0);
+  // Computed cost from time logs: sum of all logged hours × hourly_rate
+  const totalLoggedH = (report?.time_logs_total_hours ?? report?.workload?.total_hours ?? 0);
+  const computedCost = hourlyRate > 0 ? Math.round(hourlyRate * parseFloat(totalLoggedH)) : 0;
+  const budgetRef    = planned > 0 ? planned : (computedCost > 0 ? computedCost : 0);
+  const budgetDisplay = executed > 0 ? executed : computedCost;
+  const budgetPct = budgetRef > 0 ? Math.min(100, Math.round((budgetDisplay / budgetRef) * 100)) : 0;
 
   // Alert sources
   const criticalRisks     = (report?.risks     ?? []).filter((r) => r.status === 'ACTIVO'  && r.probability === 'ALTA' && r.impact === 'ALTO');
@@ -733,39 +739,59 @@ function ProjectOverview({ project, report, reload, isManager, onTabChange }) {
           )}
 
           {/* Budget */}
-          {isManager && planned > 0 && (
+          {isManager && (planned > 0 || hourlyRate > 0) && (
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
                   <TrendingUp size={12} className="text-emerald-500" /> Presupuesto
                 </h3>
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                  budgetPct > 100 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-                  : budgetPct > 80 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
-                  : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                }`}>
-                  {budgetPct}% ejecutado
-                </span>
-              </div>
-              <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-2">
-                <div
-                  className={`h-full rounded-full transition-all ${budgetPct > 100 ? 'bg-red-500' : budgetPct > 80 ? 'bg-amber-500' : 'bg-emerald-500'}`}
-                  style={{ width: `${Math.min(100, budgetPct)}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-xs text-slate-400">
-                <span>
-                  Planeado:{' '}
-                  <span className="font-medium text-slate-600 dark:text-slate-300">
-                    ${Number(planned).toLocaleString()}
+                {budgetRef > 0 && (
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                    budgetPct > 100 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                    : budgetPct > 80 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                    : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                  }`}>
+                    {budgetPct}% ejecutado
                   </span>
-                </span>
-                <span>
-                  Ejecutado:{' '}
-                  <span className={`font-medium ${budgetPct > 100 ? 'text-red-600' : 'text-slate-600 dark:text-slate-300'}`}>
-                    ${Number(executed).toLocaleString()}
-                  </span>
-                </span>
+                )}
+              </div>
+              {budgetRef > 0 && (
+                <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-2">
+                  <div
+                    className={`h-full rounded-full transition-all ${budgetPct > 100 ? 'bg-red-500' : budgetPct > 80 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                    style={{ width: `${Math.min(100, budgetPct)}%` }}
+                  />
+                </div>
+              )}
+              <div className="space-y-1 text-xs text-slate-400">
+                {planned > 0 && (
+                  <div className="flex justify-between">
+                    <span>Planeado:</span>
+                    <span className="font-medium text-slate-600 dark:text-slate-300">${Number(planned).toLocaleString()}</span>
+                  </div>
+                )}
+                {executed > 0 && (
+                  <div className="flex justify-between">
+                    <span>Ejecutado:</span>
+                    <span className={`font-medium ${budgetPct > 100 ? 'text-red-600' : 'text-slate-600 dark:text-slate-300'}`}>
+                      ${Number(executed).toLocaleString()}
+                    </span>
+                  </div>
+                )}
+                {hourlyRate > 0 && (
+                  <div className="flex justify-between border-t border-slate-100 dark:border-slate-700 pt-1 mt-1">
+                    <span>Tarifa/hora:</span>
+                    <span className="font-medium text-slate-600 dark:text-slate-300">${hourlyRate}/h</span>
+                  </div>
+                )}
+                {hourlyRate > 0 && parseFloat(totalLoggedH) > 0 && (
+                  <div className="flex justify-between">
+                    <span>Costo estimado ({parseFloat(totalLoggedH).toFixed(1)}h registradas):</span>
+                    <span className={`font-medium ${computedCost > planned && planned > 0 ? 'text-red-600' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                      ${computedCost.toLocaleString()}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           )}

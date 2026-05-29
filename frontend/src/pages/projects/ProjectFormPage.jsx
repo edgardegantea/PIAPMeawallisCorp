@@ -28,7 +28,7 @@ const EMPTY = {
   director_id: '', sponsor_id: '',
   planned_start_date: '', planned_end_date: '',
   actual_start_date: '',  actual_end_date: '',
-  planned_budget: '', actual_budget: '0',
+  planned_budget: '', actual_budget: '0', hourly_rate: '',
   completion_percentage: '0',
   objectives: '', scope: '', deliverables: '',
   identified_risks: '', constraints: '', assumptions: '', notes: '',
@@ -82,6 +82,7 @@ export default function ProjectFormPage() {
           actual_end_date:       p.actual_end_date   ?? '',
           planned_budget:        p.planned_budget    ?? '0',
           actual_budget:         p.actual_budget     ?? '0',
+          hourly_rate:           p.hourly_rate       ?? '',
           completion_percentage: p.completion_percentage ?? '0',
           objectives:            p.objectives        ?? '',
           scope:                 p.scope             ?? '',
@@ -307,6 +308,7 @@ export default function ProjectFormPage() {
                     <div className="grid grid-cols-2 gap-4">
                       {inp('planned_budget', 'Presupuesto Planificado ($)', 'number', true, '0.00')}
                       {inp('actual_budget',  'Presupuesto Ejecutado ($)',   'number', false, '0.00')}
+                      {inp('hourly_rate',    'Tarifa por hora ($/h)',        'number', false, '0.00')}
                     </div>
                   </div>
 
