@@ -20,8 +20,8 @@ class CreateProjectTemplatesTable extends Migration
             'updated_at'   => ['type' => 'DATETIME', 'null' => true],
         ]);
         $this->forge->addKey('id', true);
-        $this->forge->addForeignKey('created_by',  'users',      'id', 'SET NULL', 'CASCADE');
-        $this->forge->addForeignKey('category_id', 'categories', 'id', 'SET NULL', 'CASCADE');
+        $this->forge->addForeignKey('created_by',  'users',             'id', 'SET NULL', 'CASCADE');
+        $this->forge->addForeignKey('category_id', 'project_categories','id', 'SET NULL', 'CASCADE');
         $this->forge->createTable('project_templates');
     }
 

@@ -27,7 +27,7 @@ class ProjectTemplatesController extends BaseController
             SELECT t.*, c.name AS category_name,
                    CONCAT(u.first_name,' ',u.last_name) AS created_by_name
             FROM project_templates t
-            LEFT JOIN categories c ON c.id = t.category_id
+            LEFT JOIN project_categories c ON c.id = t.category_id
             LEFT JOIN users      u ON u.id = t.created_by
             WHERE t.is_public = 1 OR t.created_by = ?
             ORDER BY t.name ASC
@@ -121,7 +121,7 @@ class ProjectTemplatesController extends BaseController
         ", [$projectId])->getResultArray();
 
         $milestones = $db->query("
-            SELECT title, description, DATEDIFF(due_date, start_date) AS days_offset
+            SELECT title, description, DATEDIFF(due_date, CURDATE()) AS days_offset
             FROM milestones WHERE project_id = ?
         ", [$projectId])->getResultArray();
 
