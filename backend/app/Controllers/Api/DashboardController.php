@@ -164,14 +164,140 @@ class DashboardController extends BaseController
             LIMIT 10
         ", [$userId, $userId])->getResultArray();
 
+        /* ── 6. Horas por día (últimos 7 días) ─────────────────────────────── */
+        $sevenDaysAgo = date('Y-m-d', strtotime('-6 days'));
+        $rawHours = $db->query("
+            SELECT DATE(work_date) AS day, COALESCE(SUM(hours), 0) AS hours
+            FROM task_time_logs
+            WHERE user_id = ? AND work_date >= ?
+            GROUP BY day
+            ORDER BY day
+        ", [$userId, $sevenDaysAgo])->getResultArray();
+
+        // Rellenar todos los días aunque no haya registros
+        $hoursMap = [];
+        foreach ($rawHours as $r) { $hoursMap[$r['day']] = (float) $r['hours']; }
+        $hoursPerDay = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $d = date('Y-m-d', strtotime("-{$i} days"));
+            $hoursPerDay[] = [
+                'date'    => $d,
+                'label'   => date('D', strtotime($d)), // Mon, Tue…
+                'hours'   => round($hoursMap[$d] ?? 0, 1),
+            ];
+        }
+
+        /* ── 7. Distribución de tareas por prioridad ────────────────────────── */
+        $rawPriority = $db->query("
+            SELECT t.priority, COUNT(*) AS cnt
+            FROM tasks t
+            WHERE t.status != 'COMPLETADA'
+              AND EXISTS (
+                  SELECT 1 FROM task_assignees ta
+                  WHERE ta.task_id = t.id AND ta.user_id = ?
+              )
+            GROUP BY t.priority
+        ", [$userId])->getResultArray();
+        $priorityDist = ['CRITICA' => 0, 'ALTA' => 0, 'MEDIA' => 0, 'BAJA' => 0];
+        foreach ($rawPriority as $r) {
+            if (isset($priorityDist[$r['priority']])) {
+                $priorityDist[$r['priority']] = (int) $r['cnt'];
+            }
+        }
+
+        /* ── 8. Avance por proyecto (activos del usuario) ───────────────────── */
+        $projectProgress = $db->query("
+            SELECT p.id, p.name, p.code,
+                   COUNT(t.id)                                                     AS total,
+                   SUM(CASE WHEN t.status = 'COMPLETADA' THEN 1 ELSE 0 END)       AS done,
+                   SUM(CASE WHEN t.status = 'EN_PROGRESO' THEN 1 ELSE 0 END)      AS in_progress,
+                   SUM(CASE WHEN t.status = 'BLOQUEADA' THEN 1 ELSE 0 END)        AS blocked,
+                   ROUND(
+                     SUM(CASE WHEN t.status = 'COMPLETADA' THEN 1 ELSE 0 END) * 100.0
+                     / NULLIF(COUNT(t.id), 0), 0
+                   )                                                                AS pct
+            FROM projects p
+            JOIN sprints  s ON s.project_id = p.id
+            JOIN tasks    t ON t.sprint_id  = s.id
+            WHERE p.is_active = 1
+              AND (
+                  p.director_id = ?
+                  OR EXISTS (
+                      SELECT 1 FROM project_members pm_p
+                      WHERE pm_p.project_id = p.id AND pm_p.user_id = ?
+                  )
+              )
+            GROUP BY p.id, p.name, p.code
+            HAVING total > 0
+            ORDER BY pct DESC
+            LIMIT 8
+        ", [$userId, $userId])->getResultArray();
+        foreach ($projectProgress as &$pp) {
+            $pp['total']       = (int) $pp['total'];
+            $pp['done']        = (int) $pp['done'];
+            $pp['in_progress'] = (int) $pp['in_progress'];
+            $pp['blocked']     = (int) $pp['blocked'];
+            $pp['pct']         = (int) ($pp['pct'] ?? 0);
+        }
+        unset($pp);
+
+        /* ── 9. Estadísticas del equipo (solo para managers) ────────────────── */
+        $authUser   = Auth::user();
+        $isManager  = in_array($authUser['role'], ['ADMIN', 'DIRECTOR', 'PM']);
+        $teamStats  = [];
+
+        if ($isManager) {
+            $teamStats = $db->query("
+                SELECT u.id,
+                       CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,'')) AS full_name,
+                       u.username,
+                       COUNT(DISTINCT ta.task_id)                                      AS tasks_assigned,
+                       SUM(CASE WHEN t.status = 'COMPLETADA' THEN 1 ELSE 0 END)        AS tasks_done,
+                       COALESCE(
+                           (SELECT SUM(tl2.hours)
+                            FROM task_time_logs tl2
+                            WHERE tl2.user_id = u.id AND tl2.work_date >= ?),
+                           0
+                       )                                                                AS hours_week
+                FROM users u
+                JOIN task_assignees ta ON ta.user_id = u.id
+                JOIN tasks          t  ON t.id = ta.task_id
+                JOIN sprints        s  ON s.id = t.sprint_id
+                JOIN projects       p  ON p.id = s.project_id
+                WHERE p.is_active = 1
+                  AND u.is_active = 1
+                  AND (
+                      p.director_id = ?
+                      OR EXISTS (
+                          SELECT 1 FROM project_members pm_t
+                          WHERE pm_t.project_id = p.id AND pm_t.user_id = ?
+                      )
+                  )
+                GROUP BY u.id, u.first_name, u.last_name, u.username
+                ORDER BY tasks_assigned DESC
+                LIMIT 10
+            ", [$weekStart, $userId, $userId])->getResultArray();
+            foreach ($teamStats as &$ts2) {
+                $ts2['tasks_assigned'] = (int) $ts2['tasks_assigned'];
+                $ts2['tasks_done']     = (int) $ts2['tasks_done'];
+                $ts2['hours_week']     = round((float) $ts2['hours_week'], 1);
+            }
+            unset($ts2);
+        }
+
         return $this->response->setJSON([
-            'tasks_summary'   => $taskStats,
-            'urgent_tasks'    => $urgentTasks,
-            'my_projects'     => $myProjects,
-            'hours_this_week' => round($hoursWeek, 1),
-            'completed_week'  => $completedWeek,
-            'alerts'          => array_slice($alerts, 0, 5),
-            'recent_activity' => $activity,
+            'tasks_summary'    => $taskStats,
+            'urgent_tasks'     => $urgentTasks,
+            'my_projects'      => $myProjects,
+            'hours_this_week'  => round($hoursWeek, 1),
+            'completed_week'   => $completedWeek,
+            'alerts'           => array_slice($alerts, 0, 5),
+            'recent_activity'  => $activity,
+            'hours_per_day'    => $hoursPerDay,
+            'priority_dist'    => $priorityDist,
+            'project_progress' => $projectProgress,
+            'team_stats'       => $teamStats,
+            'is_manager'       => $isManager,
         ]);
     }
 }

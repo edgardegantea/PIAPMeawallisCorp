@@ -7,8 +7,12 @@ import { toast } from 'sonner';
 import {
   CheckCircle2, Clock, AlertTriangle, Zap, FolderKanban,
   TrendingUp, ListTodo, ChevronRight, Activity, Users,
-  CalendarDays, Flag, BarChart2, ArrowRight, Circle,
+  CalendarDays, Flag, BarChart2, ArrowRight, Circle, PieChart as PieIcon,
 } from 'lucide-react';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend,
+} from 'recharts';
 
 // ── Constantes ──────────────────────────────────────────────────────────────
 const STATUS_ACCENT = {
@@ -220,6 +224,169 @@ function TaskRow({ task, onStatusChange, updating }) {
   );
 }
 
+// ── Chart helpers ────────────────────────────────────────────────────────────
+const DONUT_COLORS = {
+  CRITICA: '#ef4444', ALTA: '#f59e0b', MEDIA: '#6366f1', BAJA: '#94a3b8',
+};
+const DONUT_LABELS = { CRITICA: 'Crítica', ALTA: 'Alta', MEDIA: 'Media', BAJA: 'Baja' };
+
+function WeeklyHoursChart({ data }) {
+  if (!data?.length) return null;
+  const maxVal = Math.max(...data.map((d) => d.hours), 1);
+  return (
+    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-4">
+      <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-4">
+        <Clock size={15} className="text-indigo-500" /> Horas registradas — últimos 7 días
+      </h2>
+      <ResponsiveContainer width="100%" height={160}>
+        <BarChart data={data} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+          <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+          <Tooltip
+            contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,.08)' }}
+            formatter={(v) => [`${v}h`, 'Horas']}
+            labelFormatter={(l) => `Día: ${l}`}
+          />
+          <Bar dataKey="hours" fill="#6366f1" radius={[4, 4, 0, 0]}
+            label={{ position: 'top', fontSize: 10, fill: '#6366f1', formatter: (v) => v > 0 ? `${v}h` : '' }} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function PriorityDonut({ dist }) {
+  const total = Object.values(dist).reduce((a, b) => a + b, 0);
+  if (total === 0) return null;
+  const pieData = Object.entries(dist)
+    .filter(([, v]) => v > 0)
+    .map(([k, v]) => ({ name: DONUT_LABELS[k], value: v, key: k }));
+
+  return (
+    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-4">
+      <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-2">
+        <PieIcon size={15} className="text-indigo-500" /> Tareas por prioridad
+      </h2>
+      <div className="flex items-center gap-4">
+        <ResponsiveContainer width="50%" height={140}>
+          <PieChart>
+            <Pie data={pieData} cx="50%" cy="50%" innerRadius={38} outerRadius={58}
+              dataKey="value" paddingAngle={3}>
+              {pieData.map((entry) => (
+                <Cell key={entry.key} fill={DONUT_COLORS[entry.key]} />
+              ))}
+            </Pie>
+            <Tooltip formatter={(v, name) => [`${v} tareas`, name]}
+              contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }} />
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="flex-1 space-y-1.5">
+          {pieData.map((entry) => (
+            <div key={entry.key} className="flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                  style={{ background: DONUT_COLORS[entry.key] }} />
+                <span className="text-slate-600 dark:text-slate-300">{entry.name}</span>
+              </span>
+              <span className="font-semibold text-slate-800 dark:text-slate-100">{entry.value}</span>
+            </div>
+          ))}
+          <div className="border-t border-slate-100 dark:border-slate-700 pt-1.5 flex items-center justify-between text-xs">
+            <span className="text-slate-400">Total activas</span>
+            <span className="font-bold text-slate-800 dark:text-slate-100">{total}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProjectProgressBars({ projects }) {
+  if (!projects?.length) return null;
+  return (
+    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-4">
+      <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-4">
+        <BarChart2 size={15} className="text-indigo-500" /> Avance de proyectos
+      </h2>
+      <div className="space-y-3">
+        {projects.map((p) => (
+          <div key={p.id}>
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span className="font-medium text-slate-700 dark:text-slate-300 truncate max-w-[60%]">
+                <span className="text-slate-400 font-mono mr-1">{p.code}</span>{p.name}
+              </span>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="text-slate-400">{p.done}/{p.total}</span>
+                <span className={`font-bold ${p.pct >= 75 ? 'text-emerald-600' : p.pct >= 40 ? 'text-blue-600' : 'text-amber-600'}`}>
+                  {p.pct}%
+                </span>
+              </div>
+            </div>
+            <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden flex">
+              <div className="h-full bg-emerald-500 rounded-full transition-all duration-700"
+                style={{ width: `${p.pct}%` }} />
+              <div className="h-full bg-blue-400 transition-all duration-700"
+                style={{ width: `${p.total > 0 ? (p.in_progress / p.total) * 100 : 0}%` }} />
+              <div className="h-full bg-red-400 transition-all duration-700"
+                style={{ width: `${p.total > 0 ? (p.blocked / p.total) * 100 : 0}%` }} />
+            </div>
+          </div>
+        ))}
+        <div className="flex items-center gap-3 pt-1 text-xs text-slate-400">
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" />Completadas</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-400" />En progreso</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400" />Bloqueadas</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const AVATAR_BAR_COLORS = ['#6366f1','#8b5cf6','#3b82f6','#10b981','#f59e0b','#ec4899','#06b6d4','#84cc16'];
+
+function TeamStatsChart({ team }) {
+  if (!team?.length) return null;
+  const chartData = team.map((u) => ({
+    name: u.full_name?.trim() || u.username,
+    asignadas:  u.tasks_assigned,
+    completadas: u.tasks_done,
+    horas:      u.hours_week,
+  }));
+  return (
+    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-4">
+      <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-4">
+        <Users size={15} className="text-indigo-500" /> Carga de equipo — sprint activo
+      </h2>
+      <ResponsiveContainer width="100%" height={200}>
+        <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+          <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+          <YAxis type="category" dataKey="name" width={90}
+            tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+          <Tooltip
+            contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
+            formatter={(v, name) => [v, name === 'asignadas' ? 'Asignadas' : name === 'completadas' ? 'Completadas' : 'Horas semana']}
+          />
+          <Bar dataKey="asignadas"   name="asignadas"   fill="#6366f1" radius={[0,4,4,0]} barSize={7} />
+          <Bar dataKey="completadas" name="completadas" fill="#10b981" radius={[0,4,4,0]} barSize={7} />
+        </BarChart>
+      </ResponsiveContainer>
+      {/* Horas row */}
+      <div className="mt-2 grid grid-cols-2 gap-1.5">
+        {team.slice(0, 6).map((u, i) => u.hours_week > 0 && (
+          <div key={u.id} className="flex items-center gap-1.5 text-xs">
+            <span className="w-2 h-2 rounded-full flex-shrink-0"
+              style={{ background: AVATAR_BAR_COLORS[i % AVATAR_BAR_COLORS.length] }} />
+            <span className="text-slate-500 truncate">{u.full_name?.split(' ')[0] || u.username}</span>
+            <span className="ml-auto font-medium text-slate-700 dark:text-slate-300">{u.hours_week}h</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ───────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { user }     = useAuthStore();
@@ -268,13 +435,18 @@ export default function DashboardPage() {
     </Layout>
   );
 
-  const ts       = data?.tasks_summary      ?? {};
-  const tasks    = data?.urgent_tasks       ?? [];
-  const projects = data?.my_projects        ?? [];
-  const alerts   = data?.alerts             ?? [];
-  const activity = data?.recent_activity    ?? [];
-  const hoursW   = data?.hours_this_week    ?? 0;
-  const completedW = data?.completed_week   ?? 0;
+  const ts              = data?.tasks_summary      ?? {};
+  const tasks           = data?.urgent_tasks       ?? [];
+  const projects        = data?.my_projects        ?? [];
+  const alerts          = data?.alerts             ?? [];
+  const activity        = data?.recent_activity    ?? [];
+  const hoursW          = data?.hours_this_week    ?? 0;
+  const completedW      = data?.completed_week     ?? 0;
+  const hoursPerDay     = data?.hours_per_day      ?? [];
+  const priorityDist    = data?.priority_dist      ?? {};
+  const projectProgress = data?.project_progress   ?? [];
+  const teamStats       = data?.team_stats         ?? [];
+  const isManager       = data?.is_manager         ?? false;
 
   return (
     <Layout>
@@ -455,6 +627,32 @@ export default function DashboardPage() {
 
           </div>
         </div>
+
+        {/* ── Sección de Gráficas ────────────────────────────────────── */}
+        {(hoursPerDay.length > 0 || projectProgress.length > 0) && (
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <TrendingUp size={16} className="text-indigo-500" />
+              <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">Estadísticas</h2>
+            </div>
+
+            {/* Fila 1: Horas semanales + Donut de prioridad */}
+            <div className="grid lg:grid-cols-3 gap-4 mb-4">
+              <div className="lg:col-span-2">
+                <WeeklyHoursChart data={hoursPerDay} />
+              </div>
+              <div>
+                <PriorityDonut dist={priorityDist} />
+              </div>
+            </div>
+
+            {/* Fila 2: Avance proyectos + Equipo (managers) */}
+            <div className={`grid gap-4 ${isManager && teamStats.length > 0 ? 'lg:grid-cols-2' : 'lg:grid-cols-1'}`}>
+              <ProjectProgressBars projects={projectProgress} />
+              {isManager && teamStats.length > 0 && <TeamStatsChart team={teamStats} />}
+            </div>
+          </div>
+        )}
 
       </div>
     </Layout>
