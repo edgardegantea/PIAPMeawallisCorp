@@ -75,9 +75,21 @@ class TaskAttachmentsController extends BaseController
                 ->setJSON(['message' => 'El archivo no puede superar ' . self::MAX_SIZE_MB . ' MB']);
         }
 
-        if (!in_array($file->getMimeType(), self::ALLOWED)) {
+        // getMimeType() uses finfo_file() on the tmp path — may fail if open_basedir
+        // restricts /tmp. Fall back to client-reported MIME or extension map.
+        try {
+            $mime = $file->getMimeType();
+        } catch (\Throwable $e) {
+            $mime = null;
+        }
+        if (!$mime || $mime === 'application/octet-stream') {
+            // Try client MIME first, then derive from extension
+            $mime = $file->getClientMimeType() ?: self::mimeFromExtension($file->getClientExtension());
+        }
+
+        if (!in_array($mime, self::ALLOWED)) {
             return $this->response->setStatusCode(422)
-                ->setJSON(['message' => 'Tipo de archivo no permitido: ' . $file->getMimeType()]);
+                ->setJSON(['message' => 'Tipo de archivo no permitido: ' . $mime]);
         }
 
         $dir = self::UPLOAD_DIR . $taskId . '/';
@@ -99,7 +111,7 @@ class TaskAttachmentsController extends BaseController
             'uploaded_by'   => Auth::id(),
             'original_name' => $file->getClientName(),
             'stored_name'   => $stored,
-            'mime_type'     => $file->getMimeType(),
+            'mime_type'     => $mime,
             'size_bytes'    => $file->getSize(),
             'created_at'    => date('Y-m-d H:i:s'),
         ]);
@@ -144,5 +156,24 @@ class TaskAttachmentsController extends BaseController
         }
 
         return $this->response->setStatusCode(204)->setBody('');
+    }
+
+    /** Fallback MIME detection from file extension when finfo is unavailable */
+    private static function mimeFromExtension(string $ext): string
+    {
+        $map = [
+            'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png',
+            'gif' => 'image/gif',  'webp' => 'image/webp', 'svg' => 'image/svg+xml',
+            'pdf' => 'application/pdf',
+            'txt' => 'text/plain', 'csv' => 'text/csv',
+            'doc' => 'application/msword',
+            'docx'=> 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'xls' => 'application/vnd.ms-excel',
+            'xlsx'=> 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'ppt' => 'application/vnd.ms-powerpoint',
+            'pptx'=> 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'zip' => 'application/zip',
+        ];
+        return $map[strtolower($ext)] ?? 'application/octet-stream';
     }
 }
