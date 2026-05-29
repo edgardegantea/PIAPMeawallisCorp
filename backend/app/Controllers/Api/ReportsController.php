@@ -381,7 +381,7 @@ class ReportsController extends BaseController
                 p.id         AS project_id,
                 p.name       AS project_name,
                 p.code       AS project_code
-            FROM time_logs tl
+            FROM task_time_logs tl
             JOIN users    u  ON u.id  = tl.user_id
             JOIN tasks    t  ON t.id  = tl.task_id
             JOIN sprints  s  ON s.id  = t.sprint_id

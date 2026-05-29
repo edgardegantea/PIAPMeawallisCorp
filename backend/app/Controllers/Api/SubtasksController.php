@@ -23,8 +23,8 @@ class SubtasksController extends BaseController
 
         $rows = $db->query("
             SELECT t.*,
-                   (SELECT COUNT(*) FROM task_assignees ta WHERE ta.task_id = t.id) AS assignee_count,
-                   (SELECT SUM(tl.hours) FROM time_logs tl WHERE tl.task_id = t.id) AS time_logged
+                   (SELECT COUNT(*) FROM task_assignees  ta WHERE ta.task_id = t.id) AS assignee_count,
+                   (SELECT SUM(tl.hours) FROM task_time_logs tl WHERE tl.task_id = t.id) AS time_logged
             FROM tasks t
             WHERE t.parent_task_id = ?
             ORDER BY t.id ASC
