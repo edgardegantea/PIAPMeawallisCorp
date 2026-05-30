@@ -155,6 +155,61 @@ export const projectsAPI = {
   createTechDocComment:       (docId, body)  => api.post(`/technicaldocs/${docId}/comments`, { body }),
   deleteTechDocComment:       (id)           => api.delete(`/tech-doc-comments/${id}`),
 
+  // AI
+  getAISummary:     (projectId)    => api.post(`/projects/${projectId}/ai-summary`),
+  getAIRisks:       (projectId)    => api.post(`/projects/${projectId}/ai-risks`),
+
+  // Portfolio
+  getPortfolio:     ()             => api.get('/portfolio'),
+
+  // Delivery prediction
+  getDeliveryPrediction: (projectId) => api.get(`/projects/${projectId}/delivery-prediction`),
+
+  // Burnup
+  getSprintBurnup:  (sprintId)     => api.get(`/sprints/${sprintId}/burnup`),
+
+  // Capacity planning
+  getCapacity:      (sprintId)     => api.get(`/sprints/${sprintId}/capacity`),
+  upsertCapacity:   (sprintId, d)  => api.post(`/sprints/${sprintId}/capacity`, d),
+
+  // CSV import
+  importCSV:        (projectId, fd)=> api.post(`/projects/${projectId}/import/csv`, fd),
+  getCSVTemplate:   ()             => `${api.defaults.baseURL}/projects/0/import/csv-template`,
+
+  // Webhooks
+  getWebhooks:      (projectId)    => api.get(`/projects/${projectId}/webhooks`),
+  createWebhook:    (projectId, d) => api.post(`/projects/${projectId}/webhooks`, d),
+  updateWebhook:    (id, d)        => api.patch(`/webhooks/${id}`, d),
+  deleteWebhook:    (id)           => api.delete(`/webhooks/${id}`),
+  testWebhook:      (id)           => api.post(`/webhooks/${id}/test`),
+
+  // Chat
+  getChat:          (projectId, after) => api.get(`/projects/${projectId}/chat`, { params: { after, limit: 50 } }),
+  sendChat:         (projectId, body)  => api.post(`/projects/${projectId}/chat`, { body }),
+  deleteChat:       (id)               => api.delete(`/chat/${id}`),
+
+  // Wiki
+  getWikiPages:     (projectId)    => api.get(`/projects/${projectId}/wiki`),
+  getWikiPage:      (id)           => api.get(`/wiki/${id}`),
+  createWikiPage:   (projectId, d) => api.post(`/projects/${projectId}/wiki`, d),
+  updateWikiPage:   (id, d)        => api.patch(`/wiki/${id}`, d),
+  deleteWikiPage:   (id)           => api.delete(`/wiki/${id}`),
+
+  // OKRs
+  getOKRs:          (projectId)    => api.get(`/projects/${projectId}/okrs`),
+  createOKR:        (projectId, d) => api.post(`/projects/${projectId}/okrs`, d),
+  updateOKR:        (id, d)        => api.patch(`/okrs/${id}`, d),
+  deleteOKR:        (id)           => api.delete(`/okrs/${id}`),
+  createKR:         (objId, d)     => api.post(`/okrs/${objId}/key-results`, d),
+  updateKR:         (id, d)        => api.patch(`/key-results/${id}`, d),
+  deleteKR:         (id)           => api.delete(`/key-results/${id}`),
+
+  // Guest invites
+  getInvites:       (projectId)    => api.get(`/projects/${projectId}/invites`),
+  createInvite:     (projectId, d) => api.post(`/projects/${projectId}/invites`, d),
+  deleteInvite:     (id)           => api.delete(`/invites/${id}`),
+  getGuestView:     (token)        => api.get(`/guest/${token}`),
+
   // Configuración
   getCompanySettings:    ()  => api.get('/company-settings'),
   updateCompanySettings: (d) => api.patch('/company-settings', d),

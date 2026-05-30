@@ -9,7 +9,7 @@ import {
   LayoutDashboard, FolderKanban, Tag, User, LogOut,
   Menu, X, ChevronRight, BarChart2, Building2, Shield, Lock,
   Bell, AlertTriangle, Clock, Flag, Search, CheckSquare,
-  Sun, Moon, ListTodo, CalendarDays, Square, LayoutTemplate, ScrollText,
+  Sun, Moon, ListTodo, CalendarDays, Square, LayoutTemplate, ScrollText, Briefcase,
 } from 'lucide-react';
 
 const SEVERITY_ICON = {
@@ -187,6 +187,7 @@ export default function Layout({ children }) {
   const sections = [
     navSection('Principal', [
       { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard'   },
+      { to: '/portfolio', icon: Briefcase,        label: 'Portfolio'   },
       { to: '/projects',  icon: FolderKanban,    label: 'Proyectos'   },
       { to: '/my-tasks',  icon: ListTodo,         label: 'Mis Tareas'  },
       { to: '/calendar',  icon: CalendarDays,     label: 'Calendario'  },

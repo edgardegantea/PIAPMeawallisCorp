@@ -10,7 +10,8 @@ import {
   Zap, ListChecks, FileText, BarChart2, Flag,
   CheckCircle2, Clock, TrendingUp, Calendar, Activity, Layers,
   ScrollText, BookOpen, Milestone, ShieldAlert, CheckSquare, Clapperboard, ClipboardList,
-  Tag, ChevronRight, User,
+  Tag, ChevronRight, User, Sparkles, MessageSquare, BookOpen as WikiIcon,
+  Target, Webhook, Link2, Upload, TrendingDown,
 } from 'lucide-react';
 import SprintList from '../../components/projects/SprintList';
 import BacklogList from '../../components/projects/BacklogList';
@@ -32,6 +33,17 @@ import DefinitionOfDone from '../../components/projects/DefinitionOfDone';
 import SprintCeremonies from '../../components/projects/SprintCeremonies';
 import SprintMetrics from '../../components/projects/SprintMetrics';
 import MeetingMinutes from '../../components/projects/MeetingMinutes';
+import AIProjectSummary from '../../components/projects/AIProjectSummary';
+import BurnupChart from '../../components/projects/BurnupChart';
+import EVMWidget from '../../components/projects/EVMWidget';
+import DeliveryPrediction from '../../components/projects/DeliveryPrediction';
+import ProjectChatView from '../../components/projects/ProjectChatView';
+import WikiView from '../../components/projects/WikiView';
+import OKRsView from '../../components/projects/OKRsView';
+import CapacityView from '../../components/projects/CapacityView';
+import WebhookManager from '../../components/projects/WebhookManager';
+import GuestInviteManager from '../../components/projects/GuestInviteManager';
+import CSVImportModal from '../../components/projects/CSVImportModal';
 
 // ─── Static data ──────────────────────────────────────────────────────────────
 
@@ -90,6 +102,14 @@ const ALL_TABS = [
   { id: 'dod',           label: 'DoD',           icon: CheckSquare,   managerOnly: false, group: 'ceremonies' },
   { id: 'ceremonies',    label: 'Ceremonias',    icon: Clapperboard,  managerOnly: false, group: 'ceremonies' },
   { id: 'meetings',      label: 'Actas',         icon: ClipboardList, managerOnly: false, group: 'ceremonies' },
+  // New features
+  { id: 'chat',          label: 'Chat',          icon: MessageSquare, managerOnly: false, group: 'people'     },
+  { id: 'wiki',          label: 'Wiki',          icon: BookOpen,      managerOnly: false, group: 'people'     },
+  { id: 'okrs',          label: 'OKRs',          icon: Target,        managerOnly: false, group: 'control'    },
+  { id: 'burnup',        label: 'Burnup',        icon: TrendingUp,    managerOnly: false, group: 'control'    },
+  { id: 'capacity',      label: 'Capacidad',     icon: Users,         managerOnly: true,  group: 'control'    },
+  { id: 'webhooks',      label: 'Webhooks',      icon: Webhook,       managerOnly: true,  group: 'people'     },
+  { id: 'guest',         label: 'Invitados',     icon: Link2,         managerOnly: true,  group: 'people'     },
 ];
 
 /** Ordered group definitions for the tab bar */
@@ -114,6 +134,10 @@ export default function ProjectDetailPage() {
   const [tab,     setTab]     = useState(searchParams.get('tab') || 'overview');
   const [loading, setLoading] = useState(true);
   const [confirm, setConfirm] = useState(null);
+  const [showCSVImport, setShowCSVImport] = useState(false);
+
+  // Active sprint for burnup/capacity
+  const activeSprint = report?.sprints?.find((s) => s.status === 'ACTIVO');
 
   const loadProject = () => {
     Promise.all([
@@ -273,7 +297,11 @@ export default function ProjectDetailPage() {
 
                 {/* Action buttons */}
                 {isManager && (
-                  <div className="flex gap-2 mt-3">
+                  <div className="flex gap-2 mt-3 flex-wrap">
+                    <button onClick={() => setShowCSVImport(true)}
+                      className="flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+                      <Upload size={13} /> Importar CSV
+                    </button>
                     <Link
                       to={`/projects/${id}/edit`}
                       className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200
@@ -385,12 +413,32 @@ export default function ProjectDetailPage() {
             {tab === 'dod'           && <DefinitionOfDone     projectId={id} isManager={isManager} />}
             {tab === 'ceremonies'    && <SprintCeremonies     projectId={id} isManager={isManager} />}
             {tab === 'meetings'      && <MeetingMinutes       projectId={id} isManager={isManager} />}
+            {tab === 'chat'          && <ProjectChatView      projectId={id} />}
+            {tab === 'wiki'          && <WikiView             projectId={id} isManager={isManager} />}
+            {tab === 'okrs'          && <OKRsView             projectId={id} isManager={isManager} />}
+            {tab === 'burnup'        && (
+              activeSprint
+                ? <BurnupChart sprintId={activeSprint.id} sprintName={activeSprint.name} />
+                : <p className="text-center py-12 text-slate-400">No hay sprint activo para mostrar el burnup.</p>
+            )}
+            {tab === 'capacity'      && (
+              <CapacityView sprintId={activeSprint?.id} sprintName={activeSprint?.name} isManager={isManager} />
+            )}
+            {tab === 'webhooks'      && <WebhookManager       projectId={id} isManager={isManager} />}
+            {tab === 'guest'         && <GuestInviteManager   projectId={id} isManager={isManager} />}
           </div>
         </div>
 
       </div>
 
       {confirm && <ConfirmModal {...confirm} onClose={() => setConfirm(null)} />}
+      {showCSVImport && (
+        <CSVImportModal
+          projectId={id}
+          onClose={() => setShowCSVImport(false)}
+          onImported={() => { setShowCSVImport(false); changeTab('kanban'); }}
+        />
+      )}
     </Layout>
   );
 }
@@ -797,6 +845,15 @@ function ProjectOverview({ project, report, reload, isManager, onTabChange }) {
           )}
         </div>
       )}
+
+      {/* ── AI Summary ──────────────────────────────────── */}
+      <AIProjectSummary projectId={project.id} isManager={isManager} />
+
+      {/* ── EVM Widget ──────────────────────────────────── */}
+      <EVMWidget project={project} />
+
+      {/* ── Delivery Prediction ─────────────────────────── */}
+      <DeliveryPrediction projectId={project.id} />
 
       {/* ── Team strip ────────────────────────────────────── */}
       {(report?.members ?? []).length > 0 && (

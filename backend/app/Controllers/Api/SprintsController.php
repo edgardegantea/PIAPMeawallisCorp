@@ -204,4 +204,126 @@ class SprintsController extends BaseController
 
         return $this->response->setJSON($result);
     }
+
+    /**
+     * GET /api/sprints/:id/burnup
+     *
+     * Burnup: total scope vs. completed work over time.
+     * Returns: { dates[], total[], completed[], scope_added[] }
+     */
+    public function burnup(int $id): ResponseInterface
+    {
+        $db     = Database::connect();
+        $sprint = $this->model->find($id);
+        if (!$sprint) {
+            return $this->response->setStatusCode(404)->setJSON(['message' => 'Sprint no encontrado']);
+        }
+
+        $start = new \DateTime($sprint['start_date'] ?? date('Y-m-d', strtotime('-14 days')));
+        $end   = new \DateTime($sprint['end_date']   ?? date('Y-m-d'));
+        $today = new \DateTime();
+        if ($end > $today) $end = $today;
+
+        // Get all tasks with their creation date and completion date
+        $tasks = $db->query("
+            SELECT t.estimated_hours, t.story_points,
+                   DATE(t.created_at)  AS added_date,
+                   CASE WHEN t.status = 'COMPLETADA' THEN DATE(t.updated_at) ELSE NULL END AS done_date
+            FROM tasks t
+            WHERE t.sprint_id = ? AND t.parent_task_id IS NULL
+        ", [$id])->getResultArray();
+
+        $dates = []; $totalScope = []; $completed = [];
+        $cur   = clone $start;
+        $runningTotal = 0; $runningDone = 0;
+
+        while ($cur <= $end) {
+            $dateStr = $cur->format('Y-m-d');
+            foreach ($tasks as $t) {
+                $pts = (float)($t['story_points'] ?? $t['estimated_hours'] ?? 1);
+                if ($t['added_date'] === $dateStr) $runningTotal += $pts;
+                if ($t['done_date']  === $dateStr) $runningDone  += $pts;
+            }
+            $dates[]      = $dateStr;
+            $totalScope[] = round($runningTotal, 1);
+            $completed[]  = round($runningDone, 1);
+            $cur->modify('+1 day');
+        }
+
+        $totalPoints = array_sum(array_map(fn($t) => (float)($t['story_points'] ?? $t['estimated_hours'] ?? 1), $tasks));
+
+        return $this->response->setJSON([
+            'sprint'       => ['id' => $id, 'name' => $sprint['name']],
+            'dates'        => $dates,
+            'total_scope'  => $totalScope,
+            'completed'    => $completed,
+            'total_points' => $totalPoints,
+        ]);
+    }
+
+    /**
+     * GET /api/projects/:projectId/delivery-prediction
+     *
+     * Estimates project completion date based on velocity (avg story points/hours per sprint).
+     */
+    public function deliveryPrediction(int $projectId): ResponseInterface
+    {
+        $db      = Database::connect();
+        $sprints = $this->model->findByProject($projectId);
+
+        // Completed sprints velocity (story points or hours)
+        $completedSprints = array_filter($sprints, fn($s) => $s['status'] === 'COMPLETADO');
+        $velocities = [];
+        foreach ($completedSprints as $s) {
+            $done = (float)($db->query("
+                SELECT COALESCE(SUM(COALESCE(story_points, estimated_hours, 1)), 0) AS v
+                FROM tasks WHERE sprint_id = ? AND status = 'COMPLETADA' AND parent_task_id IS NULL
+            ", [$s['id']])->getRow()->v ?? 0);
+            if ($done > 0) $velocities[] = $done;
+        }
+
+        $avgVelocity = count($velocities) ? array_sum($velocities) / count($velocities) : null;
+
+        // Remaining work
+        $remaining = (float)($db->query("
+            SELECT COALESCE(SUM(COALESCE(t.story_points, t.estimated_hours, 1)), 0) AS rem
+            FROM tasks t
+            JOIN sprints s ON s.id = t.sprint_id
+            WHERE s.project_id = ? AND t.status != 'COMPLETADA' AND t.parent_task_id IS NULL
+        ", [$projectId])->getRow()->rem ?? 0);
+
+        if (!$avgVelocity || $avgVelocity <= 0) {
+            return $this->response->setJSON([
+                'avg_velocity'     => null,
+                'remaining_points' => $remaining,
+                'sprints_needed'   => null,
+                'predicted_date'   => null,
+                'confidence'       => 'low',
+                'message'          => 'Insuficientes sprints completados para predecir',
+            ]);
+        }
+
+        $sprintsNeeded = ceil($remaining / $avgVelocity);
+        $activeSprint  = array_values(array_filter($sprints, fn($s) => $s['status'] === 'ACTIVO'))[0] ?? null;
+        $sprintDays    = 14; // default sprint length
+        if ($activeSprint && $activeSprint['start_date'] && $activeSprint['end_date']) {
+            $sprintDays = max(1, (new \DateTime($activeSprint['end_date']))->diff(new \DateTime($activeSprint['start_date']))->days);
+        }
+
+        $predictedDate = (new \DateTime())->modify("+{$sprintsNeeded} sprints")->modify("+{$sprintsNeeded} sprints");
+        $predictedDate = new \DateTime();
+        $predictedDate->modify('+' . ($sprintsNeeded * $sprintDays) . ' days');
+
+        $confidence = count($velocities) >= 3 ? 'high' : (count($velocities) >= 1 ? 'medium' : 'low');
+
+        return $this->response->setJSON([
+            'avg_velocity'       => round($avgVelocity, 1),
+            'remaining_points'   => $remaining,
+            'sprints_needed'     => $sprintsNeeded,
+            'predicted_date'     => $predictedDate->format('Y-m-d'),
+            'confidence'         => $confidence,
+            'velocity_samples'   => count($velocities),
+            'planned_end_date'   => $db->table('projects')->select('planned_end_date')->where('id', $projectId)->get()->getRow()->planned_end_date ?? null,
+        ]);
+    }
 }

@@ -3,6 +3,7 @@ import { useAuthStore } from '../stores/authStore';
 import { projectsAPI } from '../services/projectsAPI';
 import Layout from '../components/Layout';
 import ConfirmModal from '../components/ConfirmModal';
+import ActivityHeatmap from '../components/ActivityHeatmap';
 import { toast } from 'sonner';
 import {
   Save, Eye, EyeOff, Mail, Phone, Briefcase, Building2, Lock,
@@ -763,6 +764,13 @@ export default function ProfilePage() {
               label={achForm.id ? 'Actualizar' : 'Agregar'} />
           </form>
         </Modal>
+      )}
+
+      {/* Activity Heatmap */}
+      {user?.id && (
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+          <ActivityHeatmap userId={user.id} />
+        </div>
       )}
 
       {confirm && <ConfirmModal {...confirm} onClose={() => setConfirm(null)} />}

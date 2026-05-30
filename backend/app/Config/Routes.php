@@ -53,7 +53,45 @@ $routes->group('api', ['filter' => 'auth'], function ($routes) {
     $routes->put('projects/(:num)',              'Api\ProjectsController::update/$1');
     $routes->patch('projects/(:num)',            'Api\ProjectsController::update/$1');
     $routes->delete('projects/(:num)',           'Api\ProjectsController::delete/$1');
-    $routes->post('projects/(:num)/progress',   'Api\ProjectsController::updateProgress/$1');
+    $routes->post('projects/(:num)/progress',              'Api\ProjectsController::updateProgress/$1');
+    // AI
+    $routes->post('projects/(:num)/ai-summary',            'Api\AIController::summary/$1');
+    $routes->post('projects/(:num)/ai-risks',              'Api\AIController::detectRisks/$1');
+    // Portfolio
+    $routes->get('portfolio',                              'Api\PortfolioController::index');
+    // Delivery prediction
+    $routes->get('projects/(:num)/delivery-prediction',    'Api\SprintsController::deliveryPrediction/$1');
+    // CSV import
+    $routes->post('projects/(:num)/import/csv',            'Api\CSVImportController::import/$1');
+    $routes->get('projects/(:num)/import/csv-template',    'Api\CSVImportController::template/$1');
+    // Guest invites
+    $routes->get('projects/(:num)/invites',                'Api\GuestController::listInvites/$1');
+    $routes->post('projects/(:num)/invites',               'Api\GuestController::createInvite/$1');
+    $routes->delete('invites/(:num)',                      'Api\GuestController::deleteInvite/$1');
+    // Webhooks
+    $routes->get('projects/(:num)/webhooks',               'Api\WebhookController::index/$1');
+    $routes->post('projects/(:num)/webhooks',              'Api\WebhookController::create/$1');
+    $routes->patch('webhooks/(:num)',                      'Api\WebhookController::update/$1');
+    $routes->delete('webhooks/(:num)',                     'Api\WebhookController::delete/$1');
+    $routes->post('webhooks/(:num)/test',                  'Api\WebhookController::test/$1');
+    // Chat
+    $routes->get('projects/(:num)/chat',                   'Api\ChatController::index/$1');
+    $routes->post('projects/(:num)/chat',                  'Api\ChatController::create/$1');
+    $routes->delete('chat/(:num)',                         'Api\ChatController::delete/$1');
+    // Wiki
+    $routes->get('projects/(:num)/wiki',                   'Api\WikiController::index/$1');
+    $routes->post('projects/(:num)/wiki',                  'Api\WikiController::create/$1');
+    $routes->get('wiki/(:num)',                            'Api\WikiController::show/$1');
+    $routes->patch('wiki/(:num)',                          'Api\WikiController::update/$1');
+    $routes->delete('wiki/(:num)',                         'Api\WikiController::delete/$1');
+    // OKRs
+    $routes->get('projects/(:num)/okrs',                   'Api\OKRsController::index/$1');
+    $routes->post('projects/(:num)/okrs',                  'Api\OKRsController::create/$1');
+    $routes->patch('okrs/(:num)',                          'Api\OKRsController::update/$1');
+    $routes->delete('okrs/(:num)',                         'Api\OKRsController::delete/$1');
+    $routes->post('okrs/(:num)/key-results',               'Api\OKRsController::createKR/$1');
+    $routes->patch('key-results/(:num)',                   'Api\OKRsController::updateKR/$1');
+    $routes->delete('key-results/(:num)',                  'Api\OKRsController::deleteKR/$1');
 
     // Categorías
     $routes->get('categories',           'Api\CategoriesController::index');
@@ -69,6 +107,9 @@ $routes->group('api', ['filter' => 'auth'], function ($routes) {
     $routes->post('sprints',                      'Api\SprintsController::create');
     $routes->get('sprints/(:num)',                'Api\SprintsController::show/$1');
     $routes->get('sprints/(:num)/burndown',       'Api\SprintsController::burndown/$1');
+    $routes->get('sprints/(:num)/burnup',         'Api\SprintsController::burnup/$1');
+    $routes->get('sprints/(:num)/capacity',       'Api\CapacityController::index/$1');
+    $routes->post('sprints/(:num)/capacity',      'Api\CapacityController::upsert/$1');
     $routes->put('sprints/(:num)',                'Api\SprintsController::update/$1');
     $routes->patch('sprints/(:num)',              'Api\SprintsController::update/$1');
     $routes->delete('sprints/(:num)',             'Api\SprintsController::delete/$1');
@@ -269,6 +310,9 @@ $routes->group('api', ['filter' => 'auth'], function ($routes) {
     $routes->get('sprints/(:num)/retro',  'Api\SprintRetrospectiveController::show/$1');
     $routes->put('sprints/(:num)/retro',  'Api\SprintRetrospectiveController::update/$1');
 });
+
+// Guest public access (read-only via invite token)
+$routes->get('api/guest/(:alphanum)', 'Api\GuestController::view/$1');
 
 // Descargas públicas — capability URLs (nombre aleatorio = seguridad suficiente)
 $routes->get('api/attachments/(:num)/download',         'Api\TaskAttachmentsController::download/$1');

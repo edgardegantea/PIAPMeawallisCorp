@@ -24,6 +24,8 @@ import MyTasksPage       from './pages/MyTasksPage';
 import CalendarPage      from './pages/CalendarPage';
 import AuditPage         from './pages/AuditPage';
 import TemplatesPage     from './pages/TemplatesPage';
+import PortfolioPage     from './pages/PortfolioPage';
+import GuestPage         from './pages/GuestPage';
 import PWAInstallPrompt  from './components/PWAInstallPrompt';
 
 function PrivateRoute({ children }) {
@@ -67,8 +69,10 @@ export default function App() {
         <Route path="/projects/:id"      element={<PrivateRoute><ProjectDetailPage /></PrivateRoute>} />
         <Route path="/projects/:id/edit" element={<PrivateRoute><ProjectFormPage /></PrivateRoute>} />
 
-        <Route path="/templates" element={<PrivateRoute><TemplatesPage /></PrivateRoute>} />
-        <Route path="/audit"     element={<PrivateRoute><AuditPage /></PrivateRoute>} />
+        <Route path="/templates"  element={<PrivateRoute><TemplatesPage /></PrivateRoute>} />
+        <Route path="/audit"      element={<PrivateRoute><AuditPage /></PrivateRoute>} />
+        <Route path="/portfolio"  element={<PrivateRoute><PortfolioPage /></PrivateRoute>} />
+        <Route path="/guest/:token" element={<GuestPage />} />
 
         {/* 404 */}
         <Route path="*" element={<NotFoundPage />} />

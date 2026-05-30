@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { projectsAPI } from '../../services/projectsAPI';
-import { CheckCircle2, Flag, Zap, Calendar } from 'lucide-react';
+import { CheckCircle2, Flag, Zap, Calendar, ChevronLeft, ChevronRight, LayoutList, LayoutGrid } from 'lucide-react';
 
 function addDays(date, days) {
   const d = new Date(date);
@@ -17,18 +17,25 @@ function fmt(date) {
 const SPRINT_COLORS = ['#6366f1','#8b5cf6','#06b6d4','#3b82f6','#10b981','#f59e0b'];
 const MILESTONE_COLORS = { completed: '#10b981', pending: '#6366f1', overdue: '#ef4444' };
 
+const PRIORITY_COLORS = { CRITICA: '#ef4444', ALTA: '#f97316', MEDIA: '#eab308', BAJA: '#94a3b8' };
+
 export default function GanttView({ projectId, project }) {
-  const [sprints, setSprints]       = useState([]);
+  const [sprints,    setSprints]    = useState([]);
   const [milestones, setMilestones] = useState([]);
-  const [loading, setLoading]       = useState(true);
+  const [tasks,      setTasks]      = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [viewMode,   setViewMode]   = useState('sprint'); // 'sprint' | 'task'
+  const [dayOffset,  setDayOffset]  = useState(0);       // pan left/right
 
   useEffect(() => {
     Promise.all([
       projectsAPI.getSprints(projectId),
       projectsAPI.getMilestones(projectId),
-    ]).then(([sp, ml]) => {
-      setSprints(sp.data);
-      setMilestones(ml.data);
+      projectsAPI.getTasks({ project_id: projectId, per_page: 200 }),
+    ]).then(([sp, ml, tk]) => {
+      setSprints(sp.data ?? []);
+      setMilestones(ml.data ?? []);
+      setTasks((tk.data?.data ?? tk.data ?? []).filter((t) => !t.parent_task_id));
     }).catch(() => {})
       .finally(() => setLoading(false));
   }, [projectId]);
@@ -39,9 +46,9 @@ export default function GanttView({ projectId, project }) {
   const allDates = [
     ...(project?.planned_start_date ? [new Date(project.planned_start_date)] : []),
     ...(project?.planned_end_date   ? [new Date(project.planned_end_date)] : []),
-    ...sprints.map((s) => new Date(s.start_date)),
-    ...sprints.map((s) => new Date(s.end_date)),
-    ...milestones.map((m) => new Date(m.due_date)),
+    ...sprints.filter((s) => s.start_date && s.end_date).flatMap((s) => [new Date(s.start_date), new Date(s.end_date)]),
+    ...milestones.filter((m) => m.due_date).map((m) => new Date(m.due_date)),
+    ...tasks.filter((t) => t.due_date).map((t) => new Date(t.due_date)),
   ].filter((d) => !isNaN(d));
 
   if (allDates.length === 0) {
@@ -55,9 +62,9 @@ export default function GanttView({ projectId, project }) {
 
   const minDate = new Date(Math.min(...allDates));
   const maxDate = new Date(Math.max(...allDates));
-  // Add padding
-  minDate.setDate(minDate.getDate() - 3);
-  maxDate.setDate(maxDate.getDate() + 3);
+  // Apply pan offset
+  minDate.setDate(minDate.getDate() - 3 + dayOffset);
+  maxDate.setDate(maxDate.getDate() + 3 + dayOffset);
 
   const totalDays = diffDays(minDate, maxDate) || 1;
 
@@ -81,13 +88,24 @@ export default function GanttView({ projectId, project }) {
   const showToday = todayPct >= 0 && todayPct <= 100;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-      <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
+    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm overflow-hidden">
+      <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center gap-3 flex-wrap">
         <Calendar size={18} className="text-indigo-500" />
-        <h3 className="font-semibold text-slate-700">Línea de Tiempo</h3>
-        <span className="text-xs text-slate-400">
-          {fmt(minDate)} → {fmt(maxDate)} ({totalDays} días)
-        </span>
+        <h3 className="font-semibold text-slate-700 dark:text-slate-200">Línea de Tiempo</h3>
+        <span className="text-xs text-slate-400">{fmt(minDate)} → {fmt(maxDate)} ({totalDays} días)</span>
+        <div className="ml-auto flex items-center gap-2">
+          <button onClick={() => setViewMode('sprint')}
+            className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${viewMode === 'sprint' ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400'}`}>
+            Sprints
+          </button>
+          <button onClick={() => setViewMode('task')}
+            className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${viewMode === 'task' ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400'}`}>
+            Tareas
+          </button>
+          <button onClick={() => setDayOffset((d) => d - 14)} className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"><ChevronLeft size={15} /></button>
+          <button onClick={() => setDayOffset(0)} className="text-xs text-indigo-600 hover:underline">Hoy</button>
+          <button onClick={() => setDayOffset((d) => d + 14)} className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"><ChevronRight size={15} /></button>
+        </div>
       </div>
 
       <div className="p-5 overflow-x-auto">
@@ -135,13 +153,44 @@ export default function GanttView({ projectId, project }) {
             </div>
           )}
 
+          {/* Task bars (task view mode) */}
+          {viewMode === 'task' && tasks.filter((t) => t.due_date).length > 0 && (
+            <>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 pl-28">Tareas</p>
+              {tasks.filter((t) => t.due_date).map((t) => (
+                <div key={t.id} className="relative h-10 mb-1 flex items-center group">
+                  <div className="w-28 flex-shrink-0 text-xs text-slate-600 dark:text-slate-300 truncate pr-2" title={t.title}>
+                    <div className="flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: PRIORITY_COLORS[t.priority] || '#94a3b8' }} />
+                      <span className="truncate">{t.title}</span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 ml-4">{t.status?.replace('_',' ')}</span>
+                  </div>
+                  <div className="flex-1 relative h-6">
+                    <div className="absolute h-full rounded flex items-center px-1.5 text-white text-[10px] overflow-hidden"
+                      style={{
+                        left: `${pct(t.due_date)}%`,
+                        width: '2%',
+                        minWidth: '8px',
+                        background: PRIORITY_COLORS[t.priority] || '#94a3b8',
+                        opacity: t.status === 'COMPLETADA' ? 0.5 : 1,
+                      }} />
+                    <span className="absolute text-[10px] text-slate-400 whitespace-nowrap" style={{ left: `calc(${pct(t.due_date)}% + 10px)`, top: '50%', transform: 'translateY(-50%)' }}>
+                      {fmt(t.due_date)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+
           {/* Sprint bars */}
-          {sprints.length > 0 && (
+          {(viewMode === 'sprint') && sprints.length > 0 && (
             <>
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 pl-28">Sprints</p>
               {sprints.map((s, idx) => (
                 <div key={s.id} className="relative h-10 mb-2 flex items-center group">
-                  <div className="w-28 flex-shrink-0 text-xs text-slate-600 truncate pr-2 font-medium"
+                  <div className="w-28 flex-shrink-0 text-xs text-slate-600 dark:text-slate-300 truncate pr-2 font-medium"
                     title={s.name}>
                     <div className="flex items-center gap-1">
                       <Zap size={11} className="text-indigo-400 flex-shrink-0" />
@@ -170,7 +219,7 @@ export default function GanttView({ projectId, project }) {
             </>
           )}
 
-          {/* Milestones */}
+          {/* Milestones — always shown */}
           {milestones.length > 0 && (
             <>
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mt-4 mb-2 pl-28">Hitos</p>
