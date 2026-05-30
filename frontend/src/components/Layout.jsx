@@ -64,7 +64,7 @@ export default function Layout({ children }) {
   const searchInputRef = useRef(null);
 
   // Flat ordered list for keyboard navigation
-  const SEARCH_CATS = ['projects', 'tasks', 'milestones', 'users'];
+  const SEARCH_CATS = ['projects', 'tasks', 'milestones', 'users', 'docs'];
   const flatResults = searchResults
     ? SEARCH_CATS.flatMap((cat) =>
         (searchResults[cat] || []).map((item) => ({ cat, item }))
@@ -162,8 +162,9 @@ export default function Layout({ children }) {
   };
 
   const getResultPath = ({ cat, item }) => {
-    if (cat === 'projects')   return `/projects/${item.id}`;
-    if (cat === 'users')      return `/users`;
+    if (cat === 'projects') return `/projects/${item.id}`;
+    if (cat === 'users')    return `/users`;
+    if (cat === 'docs')     return `/projects/${item.project_id}?tab=technicaldocs`;
     return `/projects/${item.project_id}`;
   };
 
@@ -348,16 +349,17 @@ export default function Layout({ children }) {
               <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 z-50 overflow-hidden">
                 {(() => {
                   const CAT_META = {
-                    projects:   { label: 'Proyectos', icon: <FolderKanban size={14} className="text-indigo-500 flex-shrink-0" /> },
-                    tasks:      { label: 'Tareas',    icon: <CheckSquare  size={14} className="text-emerald-500 flex-shrink-0" /> },
-                    milestones: { label: 'Hitos',     icon: <Flag         size={14} className="text-purple-500 flex-shrink-0" /> },
-                    users:      { label: 'Usuarios',  icon: <User         size={14} className="text-rose-400 flex-shrink-0" /> },
+                    projects:   { label: 'Proyectos',  icon: <FolderKanban  size={14} className="text-indigo-500 flex-shrink-0" /> },
+                    tasks:      { label: 'Tareas',     icon: <CheckSquare   size={14} className="text-emerald-500 flex-shrink-0" /> },
+                    milestones: { label: 'Hitos',      icon: <Flag          size={14} className="text-purple-500 flex-shrink-0" /> },
+                    users:      { label: 'Usuarios',   icon: <User          size={14} className="text-rose-400 flex-shrink-0" /> },
+                    docs:       { label: 'Documentos', icon: <LayoutTemplate size={14} className="text-amber-500 flex-shrink-0" /> },
                   };
                   let globalIdx = 0;
                   const sections = SEARCH_CATS.map((cat) => {
                     const items = searchResults[cat] || [];
                     if (!items.length) return null;
-                    const { label, icon } = CAT_META[cat];
+                    const { label, icon } = CAT_META[cat] ?? { label: cat, icon: null };
                     return (
                       <div key={cat}>
                         <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide px-4 pt-3 pb-1">{label}</p>
@@ -366,9 +368,12 @@ export default function Layout({ children }) {
                           const isSelected = idx === searchSelectedIdx;
                           const path = cat === 'projects' ? `/projects/${item.id}`
                                      : cat === 'users'    ? `/users`
+                                     : cat === 'docs'     ? `/projects/${item.project_id}?tab=technicaldocs`
                                      : `/projects/${item.project_id}`;
                           const subtitle = cat === 'users'
                             ? (item.position || item.role?.replace('_', ' '))
+                            : cat === 'docs'
+                            ? item.project_name
                             : (item.project_name || item.project_code || null);
                           return (
                             <button key={item.id} onClick={() => handleSearchSelect(path)}

@@ -140,12 +140,20 @@ export const projectsAPI = {
   deleteContract:  (id)             => api.delete(`/contracts/${id}`),
 
   // Documentación técnica de proyecto
-  getTechnicalDocs:       (projectId)    => api.get(`/projects/${projectId}/technicaldocs`),
-  createTechnicalDoc:     (projectId, d) => api.post(`/projects/${projectId}/technicaldocs`, d),
-  uploadTechnicalDoc:     (projectId, fd)=> api.post(`/projects/${projectId}/technicaldocs`, fd),
-  updateTechnicalDoc:     (id, d)        => api.patch(`/technicaldocs/${id}`, d),
-  deleteTechnicalDoc:     (id)           => api.delete(`/technicaldocs/${id}`),
-  getTechnicalDocDownloadUrl: (id)       => `${api.defaults.baseURL}/technicaldocs/${id}/download`,
+  getTechnicalDocs:           (projectId)    => api.get(`/projects/${projectId}/technicaldocs`),
+  createTechnicalDoc:         (projectId, d) => api.post(`/projects/${projectId}/technicaldocs`, d),
+  uploadTechnicalDoc:         (projectId, fd)=> api.post(`/projects/${projectId}/technicaldocs`, fd),
+  updateTechnicalDoc:         (id, d)        => api.patch(`/technicaldocs/${id}`, d),
+  deleteTechnicalDoc:         (id)           => api.delete(`/technicaldocs/${id}`),
+  approveTechnicalDoc:        (id, d)        => api.post(`/technicaldocs/${id}/approve`, d),
+  requestTechnicalDocReview:  (id)           => api.post(`/technicaldocs/${id}/request-review`),
+  sortTechnicalDoc:           (id, order)    => api.patch(`/technicaldocs/${id}/sort`, { sort_order: order }),
+  getTechnicalDocDownloadUrl: (id)           => `${api.defaults.baseURL}/technicaldocs/${id}/download`,
+  getTechDocVersions:         (docId)        => api.get(`/technicaldocs/${docId}/versions`),
+  getTechDocVersionDownloadUrl:(id)          => `${api.defaults.baseURL}/tech-doc-versions/${id}/download`,
+  getTechDocComments:         (docId)        => api.get(`/technicaldocs/${docId}/comments`),
+  createTechDocComment:       (docId, body)  => api.post(`/technicaldocs/${docId}/comments`, { body }),
+  deleteTechDocComment:       (id)           => api.delete(`/tech-doc-comments/${id}`),
 
   // Configuración
   getCompanySettings:    ()  => api.get('/company-settings'),

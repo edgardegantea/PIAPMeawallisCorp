@@ -6,15 +6,19 @@ use App\Controllers\BaseController;
 use App\Models\TechnicalDocModel;
 use App\Libraries\ActivityLogger;
 use App\Libraries\Auth;
+use Config\Database;
 
 /**
- * Technical documentation for projects — supports both file uploads and external URLs.
+ * Technical documentation for projects — file upload, versioning, approval flow.
  *
  * GET    /api/projects/:id/technicaldocs
- * POST   /api/projects/:id/technicaldocs   multipart/form-data (field: file) OR JSON
+ * POST   /api/projects/:id/technicaldocs        multipart OR JSON
  * PATCH  /api/technicaldocs/:id
  * DELETE /api/technicaldocs/:id
- * GET    /api/technicaldocs/:id/download   (public — no auth required)
+ * GET    /api/technicaldocs/:id/download        public
+ * POST   /api/technicaldocs/:id/approve         { comment? }
+ * POST   /api/technicaldocs/:id/request-review
+ * PATCH  /api/technicaldocs/:id/sort            { sort_order }
  */
 class TechnicalDocsController extends BaseController
 {
@@ -141,10 +145,20 @@ class TechnicalDocsController extends BaseController
             $dir = self::UPLOAD_DIR . $doc['project_id'] . '/';
             if (!is_dir($dir)) mkdir($dir, 0775, true);
 
-            // Delete old stored file if exists
+            // Snapshot old file as version before replacing
             if (!empty($doc['stored_name'])) {
-                $oldPath = $dir . $doc['stored_name'];
-                if (file_exists($oldPath)) @unlink($oldPath);
+                $db = Database::connect();
+                $db->table('tech_doc_versions')->insert([
+                    'doc_id'        => $id,
+                    'version_label' => $doc['version'] ?? '?',
+                    'original_name' => $doc['original_name'] ?? $doc['stored_name'],
+                    'stored_name'   => $doc['stored_name'],
+                    'mime_type'     => $doc['mime_type'],
+                    'size_bytes'    => $doc['size_bytes'],
+                    'created_by'    => Auth::id(),
+                    'created_at'    => date('Y-m-d H:i:s'),
+                ]);
+                // Do NOT unlink — the version record still points to it
             }
 
             $stored = $file->getRandomName();
@@ -177,6 +191,54 @@ class TechnicalDocsController extends BaseController
         return $this->response->setJSON(['data' => $this->model->find($id)]);
     }
 
+    // POST /api/technicaldocs/:id/approve
+    public function approve(int $id): \CodeIgniter\HTTP\ResponseInterface
+    {
+        $doc = $this->model->find($id);
+        if (!$doc) return $this->response->setStatusCode(404)->setJSON(['message' => 'Documento no encontrado']);
+
+        $data    = $this->request->getJSON(true) ?? [];
+        $comment = trim($data['comment'] ?? '');
+
+        $this->model->update($id, [
+            'status'           => 'APROBADO',
+            'approved_by'      => Auth::id(),
+            'approved_at'      => date('Y-m-d H:i:s'),
+            'approval_comment' => $comment ?: null,
+        ]);
+
+        ActivityLogger::log(
+            $doc['project_id'], 'technicaldoc_approved', 'technical_doc', $id,
+            'Documento aprobado: ' . $doc['title'] . ($comment ? ' — ' . $comment : '')
+        );
+
+        return $this->response->setJSON(['data' => $this->model->find($id)]);
+    }
+
+    // POST /api/technicaldocs/:id/request-review
+    public function requestReview(int $id): \CodeIgniter\HTTP\ResponseInterface
+    {
+        $doc = $this->model->find($id);
+        if (!$doc) return $this->response->setStatusCode(404)->setJSON(['message' => 'Documento no encontrado']);
+
+        $this->model->update($id, ['status' => 'EN_REVISION']);
+
+        ActivityLogger::log(
+            $doc['project_id'], 'technicaldoc_review_requested', 'technical_doc', $id,
+            'Revisión solicitada: ' . $doc['title']
+        );
+
+        return $this->response->setJSON(['data' => $this->model->find($id)]);
+    }
+
+    // PATCH /api/technicaldocs/:id/sort
+    public function updateSort(int $id): \CodeIgniter\HTTP\ResponseInterface
+    {
+        $data = $this->request->getJSON(true) ?? [];
+        $this->model->update($id, ['sort_order' => (int)($data['sort_order'] ?? 0)]);
+        return $this->response->setJSON(['ok' => true]);
+    }
+
     // GET /api/technicaldocs/:id/download  (public route)
     public function download(int $id): void
     {
@@ -205,6 +267,9 @@ class TechnicalDocsController extends BaseController
             echo json_encode(['message' => 'Archivo no encontrado en el servidor']);
             exit;
         }
+
+        // Increment download counter
+        $this->model->set('download_count', 'download_count + 1', false)->where('id', $id)->update();
 
         $mime = $doc['mime_type'] ?: 'application/octet-stream';
         $name = $doc['original_name'] ?: $doc['stored_name'];

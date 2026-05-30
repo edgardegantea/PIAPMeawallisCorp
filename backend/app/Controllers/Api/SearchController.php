@@ -80,11 +80,23 @@ class SearchController extends BaseController
             ->limit(4)
             ->get()->getResultArray();
 
+        // Technical docs
+        $docs = $db->query("
+            SELECT d.id, d.title, d.doc_type, d.status, d.version,
+                   d.project_id, p.name AS project_name
+            FROM project_technical_docs d
+            JOIN projects p ON p.id = d.project_id
+            WHERE (d.title LIKE ? OR d.description LIKE ? OR d.tags LIKE ?)
+              AND p.is_active = 1
+            LIMIT 5
+        ", ["%{$q}%", "%{$q}%", "%{$q}%"])->getResultArray();
+
         return $this->response->setJSON([
             'projects'   => $projects,
             'tasks'      => $tasks,
             'milestones' => $milestones,
             'users'      => $users,
+            'docs'       => $docs,
         ]);
     }
 }

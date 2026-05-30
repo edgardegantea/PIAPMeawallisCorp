@@ -229,10 +229,18 @@ $routes->group('api', ['filter' => 'auth'], function ($routes) {
     $routes->delete('contracts/(:num)',           'Api\ContractsController::delete/$1');
 
     // Documentación técnica de proyecto
-    $routes->get('projects/(:num)/technicaldocs',    'Api\TechnicalDocsController::index/$1');
-    $routes->post('projects/(:num)/technicaldocs',   'Api\TechnicalDocsController::create/$1');
-    $routes->patch('technicaldocs/(:num)',            'Api\TechnicalDocsController::update/$1');
-    $routes->delete('technicaldocs/(:num)',           'Api\TechnicalDocsController::delete/$1');
+    $routes->get('projects/(:num)/technicaldocs',       'Api\TechnicalDocsController::index/$1');
+    $routes->post('projects/(:num)/technicaldocs',      'Api\TechnicalDocsController::create/$1');
+    $routes->patch('technicaldocs/(:num)',              'Api\TechnicalDocsController::update/$1');
+    $routes->delete('technicaldocs/(:num)',             'Api\TechnicalDocsController::delete/$1');
+    $routes->post('technicaldocs/(:num)/approve',       'Api\TechnicalDocsController::approve/$1');
+    $routes->post('technicaldocs/(:num)/request-review','Api\TechnicalDocsController::requestReview/$1');
+    $routes->patch('technicaldocs/(:num)/sort',         'Api\TechnicalDocsController::updateSort/$1');
+    // Versions & comments (authenticated)
+    $routes->get('technicaldocs/(:num)/versions',      'Api\TechDocVersionsController::index/$1');
+    $routes->get('technicaldocs/(:num)/comments',      'Api\TechDocCommentsController::index/$1');
+    $routes->post('technicaldocs/(:num)/comments',     'Api\TechDocCommentsController::create/$1');
+    $routes->delete('tech-doc-comments/(:num)',         'Api\TechDocCommentsController::delete/$1');
 
     // Épicas
     $routes->get('epics',             'Api\EpicsController::index');
@@ -263,8 +271,9 @@ $routes->group('api', ['filter' => 'auth'], function ($routes) {
 });
 
 // Descargas públicas — capability URLs (nombre aleatorio = seguridad suficiente)
-$routes->get('api/attachments/(:num)/download',    'Api\TaskAttachmentsController::download/$1');
-$routes->get('api/technicaldocs/(:num)/download',  'Api\TechnicalDocsController::download/$1');
+$routes->get('api/attachments/(:num)/download',         'Api\TaskAttachmentsController::download/$1');
+$routes->get('api/technicaldocs/(:num)/download',       'Api\TechnicalDocsController::download/$1');
+$routes->get('api/tech-doc-versions/(:num)/download',   'Api\TechDocVersionsController::download/$1');
 
 // Rutas ADMIN (auth + admin filter)
 $routes->group('api/admin', ['filter' => ['auth', 'admin']], function ($routes) {
